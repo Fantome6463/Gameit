@@ -106,10 +106,10 @@ button { font: inherit; color: inherit; }
 /* Main */
 .main { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 14px; align-items: start; }
 .floor { display: grid; gap: 8px; min-width: 0; }
-.halls { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+.halls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
 .halls button {
   flex: 0 0 auto; display: grid; gap: 0; text-align: left;
-  padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px 4px 0 0; background: var(--panel); cursor: pointer;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); cursor: pointer; min-width: 0;
 }
 .halls button small { font: 500 10.5px var(--f-mono); color: var(--dim); }
 .halls button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); }
@@ -135,9 +135,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 /* Side */
 .side { display: grid; gap: 12px; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
-.tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); border-bottom: 1px solid var(--line); }
 .tabs button {
-  flex: 1 0 auto; padding: 9px 10px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer;
+  padding: 9px 6px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; white-space: nowrap;
   font: 600 12px var(--f-body); color: var(--dim);
 }
 .tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
@@ -162,8 +162,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 .tag.sto { background: rgba(161, 132, 230, .25); color: #c9b8f5; }
 .tag.gpu { background: rgba(232, 145, 63, .25); color: #f4bd88; }
 .meta { font: 500 12px var(--f-mono); color: var(--dim); font-variant-numeric: tabular-nums; }
-.bar { height: 5px; background: var(--bay); border-radius: 3px; overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--ok); }
+.meter { height: 5px; background: var(--bay); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--ok); }
 .cap { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: center; font: 500 12px var(--f-mono); }
 .slots { display: grid; gap: 4px; }
 .slot { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 5px 8px; background: var(--bay); border-radius: 3px; font: 500 12px var(--f-mono); }
@@ -970,7 +970,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const c = S.cap[k], d = S.peak[k];
     const pct = c ? Math.min(100, (d / c) * 100) : d ? 100 : 0;
     const col = d > c ? 'var(--crit)' : pct > 85 ? 'var(--warn)' : 'var(--ok)';
-    return `<div class="cap"><span>${TYPES[k].name}</span><div class="bar"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}</span></div>`;
+    return `<div class="cap"><span>${TYPES[k].name}</span><div class="meter"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}</span></div>`;
   };
 
   const TAB = {
@@ -1039,7 +1039,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     tech() {
       const r = S.research;
       const cur = r ? TECH.find((t) => t.id === r.id) : null;
-      return `${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="bar"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
+      return `${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="meter"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
         <div class="list">${TECH.map((t) => {
           const done = hasTech(t.id);
           const reqOk = !t.req || t.req.every(hasTech);
@@ -1089,7 +1089,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const D = HALLS[S.cur];
     const box = $('#cbox');
     const avail = Math.max(240, box.clientWidth - 18);
-    T = Math.floor(clamp(avail / (D.w + 0.8), 26, 64));
+    T = Math.floor(clamp(avail / (D.w + 0.8), 26, 96));
     O = Math.round(T * 0.4);
     const w = D.w * T + O * 2, h = D.h * T + O * 2;
     const dpr = window.devicePixelRatio || 1;
