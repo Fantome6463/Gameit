@@ -78,6 +78,7 @@ function tick() {
           heat += m.heat * (0.3 + 0.7 * util[m.type]) * (m.type === 'gpu' && hasTech('liquid') ? 0.5 : 1);
         }
       }
+      if (t.net && !H.dark) heat += SW[t.net.k].heat;
       if (t.fire) heat += 30;
       t.heat = heat;
       const target = amb + heat * 0.12 + Math.max(0, heat - t.cool) * 1.2;
@@ -393,7 +394,7 @@ function allRacks(f = () => true) {
   S.halls.forEach((H, hi) => { if (H.open) H.grid.forEach((t, i) => { if (t && t.k === 'rack' && f(t)) out.push({ t, hi, i }); }); });
   return out;
 }
-const freeSlots = () => allRacks().reduce((a, r) => a + RACK_SLOTS - r.t.s.length, 0);
+const freeSlots = () => allRacks().reduce((a, r) => a + slotsFree(r.t), 0);
 const hasMiner = () => S.halls.some((H) => H.grid.some((t) => t && t.k === 'miner'));
 function minerSpot() {
   for (let hi = 0; hi < S.halls.length; hi++) {

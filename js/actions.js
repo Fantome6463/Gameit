@@ -9,14 +9,15 @@ function selTile() { return S.sel ? S.halls[S.sel.h].grid[S.sel.i] : null; }
 
 function place(kind, h, i) {
   const H = S.halls[h];
-  if (H.grid[i]) return false;
   const b = BUILD[kind];
   if (!b || b.hidden) return false;
   if (b.req && !hasTech(b.req)) { toast('Сначала изучите технологию', 'bad'); return false; }
+  if (b.inRack) { const ok = installSwitch(h, i, kind); if (ok) { Sound.build(); refreshHall(h); } return ok; }
+  if (H.grid[i]) return false;
   const st = hallStats(h);
   if (b.kw && st.load + b.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return false; }
   if (!spend(b.price)) return false;
-  H.grid[i] = kind === 'rack' ? mkRack() : SW[kind] ? { k: kind, cfg: hasTech('sdn') ? 'ok' : 'raw' } : { k: kind };
+  H.grid[i] = kind === 'rack' ? mkRack() : { k: kind };
   Sound.build();
   refreshHall(h);
   return true;
@@ -24,7 +25,7 @@ function place(kind, h, i) {
 function refreshHall(h) { const st = hallStats(h); Object.assign(S.halls[h], { load: st.load, cap: st.cap, backup: st.backup }); }
 
 function refund(t) {
-  if (t.k === 'rack') return BUILD.rack.price * 0.5 + t.s.reduce((a, m) => a + sellOf(m), 0);
+  if (t.k === 'rack') return BUILD.rack.price * 0.5 + t.s.reduce((a, m) => a + sellOf(m), 0) + (t.net ? BUILD[t.net.k].price * 0.5 : 0);
   return BUILD[t.k].price * 0.5;
 }
 
@@ -71,7 +72,7 @@ const ACT = {
   build(a) { if (S.sel) place(a, S.sel.h, S.sel.i); },
   addsrv(a) {
     const t = selTile(); const m = MODELS[a];
-    if (!t || t.k !== 'rack' || t.s.length >= RACK_SLOTS) return;
+    if (!t || t.k !== 'rack' || slotsFree(t) <= 0) return;
     const st = hallStats(S.sel.h);
     if (st.load + m.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return; }
     if (!spend(priceOf(a))) return;
@@ -135,8 +136,8 @@ const ACT = {
   },
   cfgApply() {
     const tg = S.cfgTarget;
-    const sw = tg && S.halls[tg.h].grid[tg.i];
-    if (!isSwitch(sw)) { $('#overlay').hidden = true; return; }
+    const sw = tg && swOf(S.halls[tg.h].grid[tg.i]);
+    if (!sw) { $('#overlay').hidden = true; return; }
     const ans = cfgAnswer(tg.h);
     let wrong = 0;
     Object.keys(CFG_OPTS).forEach((k) => { if ($(`#cfg-${k}`).value !== ans[k]) wrong++; });
@@ -151,7 +152,7 @@ const ACT = {
     const H = S.halls[S.cur];
     let n = 0;
     if (a === 'cable') H.grid.forEach((t, i) => { if (t && t.k === 'rack' && t.link === null && startCable(S.cur, i, 'contract', true)) n++; });
-    else H.grid.forEach((t, i) => { if (isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad') && startCfg(S.cur, i, 'contract')) n++; });
+    else H.grid.forEach((t, i) => { if (isSwitch(t) && (t.net.cfg === 'raw' || t.net.cfg === 'bad') && startCfg(S.cur, i, 'contract')) n++; });
     if (n) log(`Подрядчик принял заказ: ${a === 'cable' ? 'кабелей' : 'коммутаторов'} — ${n}`);
     else toast('Нечего делать или не хватает денег', 'bad');
   },
@@ -203,7 +204,7 @@ const ACT = {
     const err = placeKit(kit, S.cur);
     if (err) { toast(err, 'bad'); return; }
     S.money -= price; S.today.other += price;
-    bumpHw(kit.model, kit.racks * kit.per);
+    bumpHw(kit.model, kitServers(kit));
     log(`Подрядчик смонтировал «${kit.name}» в зале «${HALLS[S.cur].name}» под ключ`, 'good');
     Sound.win();
   },
@@ -293,12 +294,21 @@ const ACT = {
     Sound.coin();
     log(`Стойка ${tileName(S.sel.h, S.sel.i)} починена вручную`, 'good');
   },
+  swremove() {
+    const t = selTile(); if (!isSwitch(t)) return;
+    const back = BUILD[t.net.k].price * 0.5;
+    S.money += back;
+    unlinkSwitch(S.sel.h, S.sel.i);
+    delete t.net;
+    refreshHall(S.sel.h);
+    toast(`Коммутатор снят, возврат ${fmt$(back)}`);
+  },
   extinguish() { const t = selTile(); if (t && t.fire) { t.fire = 0; Sound.coin(); log('Пожар потушен вручную', 'good'); } },
   demolish() {
     const t = selTile(); if (!t) return;
     const back = refund(t);
     S.money += back;
-    if (isSwitch(t)) S.halls[S.sel.h].grid.forEach((r) => { if (r && r.k === 'rack' && r.link === S.sel.i) { r.link = null; r.cable = 'none'; } });
+    if (isSwitch(t)) unlinkSwitch(S.sel.h, S.sel.i);
     S.halls[S.sel.h].grid[S.sel.i] = null;
     refreshHall(S.sel.h);
     toast(`Демонтировано, возврат ${fmt$(back)}`);

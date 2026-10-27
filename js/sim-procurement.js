@@ -10,7 +10,7 @@ function findSlot(kw) {
     const st = hallStats(hi);
     if (st.load + kw > st.cap) return;
     H.grid.forEach((t, i) => {
-      if (!t || t.k !== 'rack' || t.fire || t.s.length >= RACK_SLOTS || t.temp > 34 || netMult(H.grid, t) === 0 && t.cable !== 'laying') return;
+      if (!t || t.k !== 'rack' || t.fire || slotsFree(t) <= 0 || t.temp > 34 || netMult(H.grid, t) === 0 && t.cable !== 'laying') return;
       if (!best || t.temp < best.t.temp) best = { hi, i, t };
     });
   });
@@ -95,7 +95,7 @@ function fillRacks(list, hi, m) {
   let n = 0;
   const M = MODELS[m];
   for (const t of list) {
-    while (t.s.length < RACK_SLOTS) {
+    while (slotsFree(t) > 0) {
       const st = hallStats(hi);
       if (st.load + M.kw > st.cap) { if (!n) toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); return n; }
       if (S.money < priceOf(m)) { if (!n) toast('Не хватает денег', 'bad'); return n; }

@@ -10,21 +10,26 @@ function rackCap(t, hallDark, grid) {
   return res;
 }
 // ----- in-hall network -----
-const isSwitch = (t) => !!(t && SW[t.k]);
+// Коммутатор живёт внутри стойки: t.net = { k: 'sw' | 'sw2', cfg }.
+const swOf = (t) => (t && t.k === 'rack' && t.net) || null;
+const isSwitch = (t) => !!swOf(t);
+const slotsUsed = (t) => t.s.length + (t.net ? SW[t.net.k].slots : 0);
+const slotsFree = (t) => RACK_SLOTS - slotsUsed(t);
 const tdist = (D, a, b) => Math.max(Math.abs((a % D.w) - (b % D.w)), Math.abs(Math.floor(a / D.w) - Math.floor(b / D.w)));
 function netMult(grid, t) {
   if (t.link === undefined) return 1;
   if (t.link === null || t.cable !== 'ok') return 0;
-  const sw = grid[t.link];
-  if (!isSwitch(sw)) return 0;
+  const sw = swOf(grid[t.link]);
+  if (!sw) return 0;
   return sw.cfg === 'ok' ? 1 : sw.cfg === 'bad' ? 0.6 : 0;
 }
 const portsUsed = (grid, si) => grid.reduce((a, t) => a + (t && t.k === 'rack' && t.link === si ? 1 : 0), 0);
 function switchFor(hi, i) {
   const H = S.halls[hi], D = HALLS[hi];
   let best = null;
-  H.grid.forEach((sw, j) => {
-    if (!isSwitch(sw)) return;
+  H.grid.forEach((t, j) => {
+    const sw = swOf(t);
+    if (!sw) return;
     const d = tdist(D, i, j);
     if (d > SW[sw.k].range || portsUsed(H.grid, j) >= SW[sw.k].ports) return;
     if (!best || d < best.d) best = { j, d };
@@ -47,32 +52,52 @@ function startCable(hi, i, by, quiet) {
   return true;
 }
 function startCfg(hi, i, by) {
-  const sw = S.halls[hi].grid[i];
-  if (!isSwitch(sw) || sw.cfg === 'work') return false;
+  const sw = swOf(S.halls[hi].grid[i]);
+  if (!sw || sw.cfg === 'work') return false;
   if (by === 'contract') { if (!spend(500)) return false; }
   sw.cfg = 'work';
   S.netJobs.push({ kind: 'cfg', h: hi, i, by, left: by === 'contract' ? 1 : 3 });
   return true;
 }
+// Ставит коммутатор в стойку (или новую стойку с коммутатором на пустую клетку).
+// Своя стойка подключается к нему патч-кордом сразу, без прокладки кабеля.
+function installSwitch(hi, i, kind) {
+  const H = S.halls[hi], b = BUILD[kind], spec = SW[kind];
+  let t = H.grid[i];
+  if (t && t.k !== 'rack') { toast('Коммутатор ставится в стойку', 'bad'); return false; }
+  if (t && t.net) { toast('В стойке уже есть коммутатор', 'bad'); return false; }
+  if (t && slotsFree(t) < spec.slots) { toast(`В стойке нет ${spec.slots > 1 ? `${spec.slots} свободных мест` : 'свободного места'} под коммутатор`, 'bad'); return false; }
+  const st = hallStats(hi);
+  if (st.load + b.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return false; }
+  if (!spend(b.price + (t ? 0 : BUILD.rack.price))) return false;
+  if (!t) t = H.grid[i] = mkRack();
+  t.net = { k: kind, cfg: hasTech('sdn') ? 'ok' : 'raw' };
+  t.link = i; t.cable = 'ok';
+  return true;
+}
+// Отключает от коммутатора в стойке i все стойки, которые к нему подключены.
+function unlinkSwitch(hi, i) {
+  S.halls[hi].grid.forEach((r) => { if (r && r.k === 'rack' && r.link === i) { r.link = null; r.cable = 'none'; } });
+}
 function netTick() {
   S.netJobs = S.netJobs.filter((j) => {
     const t = S.halls[j.h].grid[j.i];
-    return j.kind === 'cable' ? t && t.k === 'rack' && t.cable === 'laying' : isSwitch(t) && t.cfg === 'work';
+    return j.kind === 'cable' ? t && t.k === 'rack' && t.cable === 'laying' : isSwitch(t) && t.net.cfg === 'work';
   });
   S.netJobs.forEach((j) => {
     if (--j.left > 0) return;
     const t = S.halls[j.h].grid[j.i];
     if (j.kind === 'cable') { t.cable = 'ok'; if (j.by === 'manual') log(`Вы проложили кабель к стойке ${tileName(j.h, j.i)}`, 'good'); }
-    else { t.cfg = 'ok'; log(`Коммутатор ${tileName(j.h, j.i)} настроен`, 'good'); }
+    else { t.net.cfg = 'ok'; log(`Коммутатор ${tileName(j.h, j.i)} настроен`, 'good'); }
     j.done = true;
   });
   S.netJobs = S.netJobs.filter((j) => !j.done);
-  if (hasTech('sdn')) S.halls.forEach((H) => H.grid.forEach((t) => { if (isSwitch(t) && t.cfg === 'raw') t.cfg = 'ok'; }));
+  if (hasTech('sdn')) S.halls.forEach((H) => H.grid.forEach((t) => { if (isSwitch(t) && t.net.cfg === 'raw') t.net.cfg = 'ok'; }));
   let free = S.staff.neteng - S.netJobs.filter((j) => j.by === 'eng').length;
   if (free <= 0) return;
   S.halls.forEach((H, hi) => {
     if (!H.open) return;
-    H.grid.forEach((t, i) => { if (free > 0 && isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad') && startCfg(hi, i, 'eng')) free--; });
+    H.grid.forEach((t, i) => { if (free > 0 && isSwitch(t) && (t.net.cfg === 'raw' || t.net.cfg === 'bad') && startCfg(hi, i, 'eng')) free--; });
   });
   S.halls.forEach((H, hi) => {
     if (!H.open) return;

@@ -22,8 +22,8 @@ const BUILD = {
   ups: { name: 'ИБП', price: 1000, kw: 0, backup: 25, short: '25 кВт', desc: 'Держит 25 кВт нагрузки зала при отключении электричества.' },
   gen: { name: 'Дизель', price: 6000, kw: 0, backup: 150, req: 'diesel', short: '150 кВт', desc: 'Генератор держит 150 кВт при отключении.' },
   trafo: { name: 'Трансформатор', price: 2500, kw: 0, power: 60, short: '+60 кВт', desc: 'Поднимает лимит мощности зала на 60 кВт.' },
-  sw: { name: 'Коммутатор ToR', price: 1200, kw: 0.3, short: '8 портов', desc: 'Подключает до 8 стоек на расстоянии до 3 клеток. После установки его нужно настроить.' },
-  sw2: { name: 'Коммутатор Spine', price: 6000, kw: 0.8, req: 'spine', short: '32 порта', desc: 'Подключает до 32 стоек на расстоянии до 6 клеток. Требует настройки.' },
+  sw: { name: 'Коммутатор ToR', price: 1200, kw: 0.3, inRack: true, short: '8 портов · 1 место', desc: 'Ставится в стойку и занимает 1 место из 6. Подключает свою стойку без кабеля и ещё до 7 стоек на расстоянии до 3 клеток. На пустой клетке ставится вместе с новой стойкой. После установки его нужно настроить.' },
+  sw2: { name: 'Коммутатор Spine', price: 6000, kw: 0.8, req: 'spine', inRack: true, short: '32 порта · 2 места', desc: 'Ставится в стойку и занимает 2 места из 6. Подключает свою стойку и ещё до 31 стойки на расстоянии до 6 клеток. Требует настройки.' },
   gas: { name: 'Газовая турбина', price: 12000, kw: 0, backup: 80, gas: 80, req: 'gas', short: '80 кВт', desc: 'Вырабатывает до 80 кВт по $0,30/кВт·ч, когда сеть дороже. При отключении держит 80 кВт.' },
   heatx: { name: 'Теплообменник', price: 6000, kw: 1, cool: 20, r: 2, heatx: true, req: 'heatreuse', short: 'продаёт тепло', desc: 'Снимает 20 ед. тепла в радиусе 2 и продаёт его городской котельной. На севере тепло стоит вдвое дороже.' },
   miner: { name: 'ASIC-ферма соседей', price: 0, kw: 6, hidden: true, desc: 'Чужая майнинг-ферма. Платит $30 в час, но выдаёт 40 ед. тепла и забирает охлаждение у соседних стоек.' },
@@ -49,7 +49,8 @@ const NET_TIERS = [
 ];
 const BW = { web: 0.15, game: 0.25, bank: 0.05, backup: 0.06, media: 0.12, ai: 0.02, render: 0.03 };
 const GAS_FUEL = 0.3, FIXED_PRICE = 0.5;
-const SW = { sw: { ports: 8, range: 3 }, sw2: { ports: 32, range: 6 } };
+// Коммутаторы стоят в стойках: slots — сколько мест из RACK_SLOTS занимают, heat — сколько тепла дают.
+const SW = { sw: { ports: 8, range: 3, slots: 1, heat: 1 }, sw2: { ports: 32, range: 6, slots: 2, heat: 2 } };
 const PARTS = {
   ch: {
     c1: { name: 'Корпус 1U', price: 60, sockets: 1, bays: 2, gpus: 0, kw: 0.05, heat: 0.3 },
@@ -78,11 +79,11 @@ const PARTS = {
   },
 };
 const KITS = [
-  { id: 'k1', name: 'Модуль «Старт»', desc: '2 стойки по 6 Bronze, кондиционер, коммутатор ToR.', racks: 2, model: 'b1', per: 6, cool: 'crac', sw: 'sw' },
-  { id: 'k2', name: 'Модуль хранения', desc: '2 стойки по 6 дисковых полок, кондиционер, ToR.', racks: 2, model: 's1', per: 6, cool: 'crac', sw: 'sw' },
-  { id: 'k3', name: 'Ряд Silver', desc: '4 стойки по 6 Silver, чиллер, ToR.', racks: 4, model: 'b2', per: 6, cool: 'chiller', sw: 'sw', req: 'silver' },
-  { id: 'k4', name: 'GPU-под', desc: '3 стойки по 3 GPU-узла, чиллер, ToR.', racks: 3, model: 'g1', per: 3, cool: 'chiller', sw: 'sw', req: 'gpu' },
-  { id: 'k5', name: 'Ряд Platinum', desc: '6 стоек по 6 Platinum, 2 чиллера, Spine.', racks: 6, model: 'b3', per: 6, cool: 'chiller', cools: 2, sw: 'sw2', req: 'platinum' },
+  { id: 'k1', name: 'Модуль «Старт»', desc: '2 стойки: 11 Bronze и коммутатор ToR, кондиционер.', racks: 2, model: 'b1', per: 6, cool: 'crac', sw: 'sw' },
+  { id: 'k2', name: 'Модуль хранения', desc: '2 стойки: 11 дисковых полок и ToR, кондиционер.', racks: 2, model: 's1', per: 6, cool: 'crac', sw: 'sw' },
+  { id: 'k3', name: 'Ряд Silver', desc: '4 стойки: 23 Silver и ToR, чиллер.', racks: 4, model: 'b2', per: 6, cool: 'chiller', sw: 'sw', req: 'silver' },
+  { id: 'k4', name: 'GPU-под', desc: '3 стойки по 3 GPU-узла, ToR в первой, чиллер.', racks: 3, model: 'g1', per: 3, cool: 'chiller', sw: 'sw', req: 'gpu' },
+  { id: 'k5', name: 'Ряд Platinum', desc: '6 стоек: 34 Platinum и Spine, 2 чиллера.', racks: 6, model: 'b3', per: 6, cool: 'chiller', cools: 2, sw: 'sw2', req: 'platinum' },
 ];
 const CFG_OPTS = {
   vlan: ['10', '20', '30', '40', '50', '60'],

@@ -4,9 +4,8 @@ let S;
 function newState() {
   const halls = HALLS.map((h, i) => ({ open: i === 0, grid: Array(h.w * h.h).fill(null), dark: false, load: 0, cap: h.kw, backup: 0 }));
   const g = halls[0].grid;
-  g[1 * 5 + 1] = Object.assign(mkRack(['b1', 'b1']), { link: 2 * 5 + 1, cable: 'ok' });
+  g[1 * 5 + 1] = Object.assign(mkRack(['b1', 'b1']), { link: 1 * 5 + 1, cable: 'ok', net: { k: 'sw', cfg: 'ok' } });
   g[1 * 5 + 2] = { k: 'crac' };
-  g[2 * 5 + 1] = { k: 'sw', cfg: 'ok' };
   const st = {
     v: SAVE_VERSION, day: 1, hour: 8, money: 3000, rep: 10, speed: 1, paused: false, started: false, over: false, won: false,
     halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0, neteng: 0, tech: 0 }, jobs: [],

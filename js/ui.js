@@ -114,37 +114,46 @@ function rackNetHtml(t, hi, i) {
     const j = S.netJobs.find((x) => x.kind === 'cable' && x.h === hi && x.i === i);
     return `<p class="muted warn">Прокладывается кабель${j ? `: ещё ${j.left} ч (${j.by === 'manual' ? 'вы сами' : j.by === 'eng' ? 'инженер' : 'подрядчик'})` : ''}</p>`;
   }
+  if (t.link === i) return ''; // свой коммутатор, его состояние показано ниже
   if (t.link !== null) {
-    const sw = S.halls[hi].grid[t.link];
-    const st = !isSwitch(sw) ? 'нет коммутатора' : sw.cfg === 'ok' ? 'работает' : sw.cfg === 'bad' ? 'ошибки в настройке, −40%' : 'коммутатор не настроен';
-    return `<p class="muted ${sw && sw.cfg === 'ok' ? 'ok' : 'warn'}">Сеть: коммутатор ${tileName(hi, t.link)} — ${st}</p>`;
+    const sw = swOf(S.halls[hi].grid[t.link]);
+    const st = !sw ? 'нет коммутатора' : sw.cfg === 'ok' ? 'работает' : sw.cfg === 'bad' ? 'ошибки в настройке, −40%' : 'коммутатор не настроен';
+    return `<p class="muted ${sw && sw.cfg === 'ok' ? 'ok' : 'warn'}">Сеть: коммутатор в стойке ${tileName(hi, t.link)} — ${st}</p>`;
   }
   const sw = switchFor(hi, i);
-  if (!sw) return '<p class="crit">Не подключена к сети: стойка не работает. Поставьте коммутатор не дальше 3 клеток (Spine — 6).</p>';
+  if (!sw) return '<p class="crit">Не подключена к сети: стойка не работает. Поставьте коммутатор в эту стойку или в стойку не дальше 3 клеток (Spine — 6).</p>';
   const busy = manualBusy();
   return `<p class="crit">Не подключена к сети: стойка не работает.</p>
     <div class="btnrow"><button class="btn sm" type="button" data-act="cable" data-a="manual" ${busy || S.money < cableCost(sw.d, 'manual') ? 'disabled' : ''}>Проложить самому · ${fmt$(cableCost(sw.d, 'manual'))}, ${1 + sw.d} ч</button>
     <button class="btn sm primary" type="button" data-act="cable" data-a="contract" ${S.money < cableCost(sw.d, 'contract') ? 'disabled' : ''}>Подрядчик · ${fmt$(cableCost(sw.d, 'contract'))}, 1 ч</button></div>
     ${S.staff.neteng ? '<p class="muted">Сетевой инженер подключит её сам, когда освободится.</p>' : ''}`;
 }
-function switchHtml(t, hi, i, where) {
-  const used = portsUsed(S.halls[hi].grid, i), spec = SW[t.k];
-  const st = { raw: ['не настроен — подключённые стойки не работают', 'crit'], work: ['идёт настройка', 'warn'], bad: ['ошибки в конфигурации: −40% мощности стоек', 'crit'], ok: ['работает', 'ok'] }[t.cfg];
-  const busy = t.cfg === 'work';
-  return `<h3>${where}</h3><p class="ttl">${BUILD[t.k].name}</p>
-    <dl class="kv"><dt>Порты</dt><dd>${used} / ${spec.ports}</dd><dt>Дальность кабеля</dt><dd>${spec.range} кл.</dd><dt>Состояние</dt><dd class="${st[1]}">${st[0]}</dd></dl>
-    ${t.cfg !== 'ok' ? `<div class="btnrow"><button class="btn sm" type="button" data-act="swcfg" data-a="manual" ${busy ? 'disabled' : ''}>Настроить вручную</button><button class="btn sm primary" type="button" data-act="swcfg" data-a="contract" ${busy || S.money < 500 ? 'disabled' : ''}>Подрядчик · $500, 1 ч</button></div>
+// Блок коммутатора в панели стойки: состояние, настройка, снятие. Без коммутатора — кнопки установки.
+function switchHtml(t, hi, i) {
+  if (!t.net) {
+    const opts = Object.keys(SW).filter((k) => !BUILD[k].req || hasTech(BUILD[k].req));
+    return `<h3>Коммутатор</h3><p class="muted">Стойка подключается к чужому коммутатору кабелем или к своему — сразу. Свой займёт место в стойке.</p><div class="shop">${opts.map((k) => {
+      const b = BUILD[k], fits = slotsFree(t) >= SW[k].slots;
+      return `<button class="btn" type="button" data-act="build" data-a="${k}" ${!fits || S.money < b.price ? 'disabled' : ''}><span>Поставить ${b.name}<small>${fits ? `${SW[k].ports} портов · дальность ${SW[k].range} кл. · занимает ${SW[k].slots} из ${RACK_SLOTS} мест` : `нужно ${SW[k].slots} свободн. места`}</small></span><span class="price">${fmt$(b.price)}</span></button>`;
+    }).join('')}</div>`;
+  }
+  const n = t.net, used = portsUsed(S.halls[hi].grid, i), spec = SW[n.k];
+  const st = { raw: ['не настроен — подключённые стойки не работают', 'crit'], work: ['идёт настройка', 'warn'], bad: ['ошибки в конфигурации: −40% мощности стоек', 'crit'], ok: ['работает', 'ok'] }[n.cfg];
+  const busy = n.cfg === 'work';
+  return `<h3>${BUILD[n.k].name} в стойке</h3>
+    <dl class="kv"><dt>Порты</dt><dd>${used} / ${spec.ports}</dd><dt>Дальность кабеля</dt><dd>${spec.range} кл.</dd><dt>Места в стойке</dt><dd>${spec.slots} из ${RACK_SLOTS}</dd><dt>Состояние</dt><dd class="${st[1]}">${st[0]}</dd></dl>
+    ${n.cfg !== 'ok' ? `<div class="btnrow"><button class="btn sm" type="button" data-act="swcfg" data-a="manual" ${busy ? 'disabled' : ''}>Настроить вручную</button><button class="btn sm primary" type="button" data-act="swcfg" data-a="contract" ${busy || S.money < 500 ? 'disabled' : ''}>Подрядчик · $500, 1 ч</button></div>
     <p class="muted">Вручную — бесплатно, но нужно свериться с регламентом сети. ${S.staff.neteng ? 'Сетевой инженер настроит сам за 3 ч.' : 'Сетевой инженер настраивает сам.'}</p>` : `<button class="btn sm" type="button" data-act="swcfg" data-a="manual">Перенастроить вручную</button>`}
-    <button class="btn danger" type="button" data-act="demolish">Демонтировать · +${fmt$(refund(t))}</button>`;
+    <button class="btn" type="button" data-act="swremove"><span>Снять коммутатор${used > 1 ? `<small>отключатся другие стойки: ${used - 1}</small>` : ''}</span><span class="price">+${fmt$(BUILD[n.k].price * 0.5)}</span></button>`;
 }
 function netPanel() {
   const H = S.halls[S.cur];
   const loose = H.grid.reduce((a, t, i) => { if (t && t.k === 'rack' && t.link === null) { const sw = switchFor(S.cur, i); if (sw) a.n++, a.cost += cableCost(sw.d, 'contract'); else a.far++; } return a; }, { n: 0, cost: 0, far: 0 });
-  const raw = H.grid.filter((t) => isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad')).length;
+  const raw = H.grid.filter((t) => isSwitch(t) && (t.net.cfg === 'raw' || t.net.cfg === 'bad')).length;
   const stockN = Object.values(S.stock).reduce((a, b) => a + b, 0);
   let html = '';
   if (loose.n) html += `<button class="btn" type="button" data-act="netall" data-a="cable" ${S.money < loose.cost ? 'disabled' : ''}><span>Подрядчик: проложить кабели к ${loose.n} стойкам<small>за 1 ч</small></span><span class="price">${fmt$(loose.cost)}</span></button>`;
-  if (loose.far) html += `<p class="muted crit">Стоек без коммутатора в радиусе: ${loose.far}. Поставьте коммутатор рядом.</p>`;
+  if (loose.far) html += `<p class="muted crit">Стоек без коммутатора в радиусе: ${loose.far}. Поставьте коммутатор в стойку рядом.</p>`;
   if (raw) html += `<button class="btn" type="button" data-act="netall" data-a="cfg" ${S.money < raw * 500 ? 'disabled' : ''}><span>Подрядчик: настроить коммутаторы (${raw})<small>за 1 ч</small></span><span class="price">${fmt$(raw * 500)}</span></button>`;
   if (stockN) html += `<button class="btn primary" type="button" data-act="stockhall"><span>Разместить склад по стойкам зала<small>собранных серверов на складе: ${stockN}</small></span><span class="price">бесплатно</span></button>`;
   return html;
@@ -153,7 +162,7 @@ function hallPanel() {
   const hi = S.cur, H = S.halls[hi];
   if (!H.open) return '<h3>Зал не арендован</h3><p class="muted">Арендуйте зал, чтобы строить.</p>';
   const racks = H.grid.filter((t) => t && t.k === 'rack');
-  const free = racks.reduce((a, t) => a + RACK_SLOTS - t.s.length, 0);
+  const free = racks.reduce((a, t) => a + slotsFree(t), 0);
   const broken = racks.reduce((a, t) => a + t.broken, 0);
   const models = Object.keys(MODELS).filter((k) => !MODELS[k].custom && (!MODELS[k].req || hasTech(MODELS[k].req)));
   const fill = free ? models.map((k) => `<button class="btn" type="button" data-act="fillhall" data-a="${k}" ${S.money < priceOf(k) ? 'disabled' : ''}><span>${MODELS[k].name} ${typeTag(MODELS[k].type)}<small>до ${free} шт. · по ${fmt$(priceOf(k))}</small></span><span class="price">${fmt$(priceOf(k) * free)}</span></button>`).join('') : '<p class="muted">Свободных слотов нет. Поставьте стойки.</p>';
@@ -188,7 +197,8 @@ const TAB = {
     if (!t) {
       return `<h3>${where}</h3><p class="muted">Пустая плитка фальшпола.</p><div class="shop">${Object.keys(BUILD).filter((k) => !BUILD[k].hidden).map((k) => {
         const b = BUILD[k]; const locked = b.req && !hasTech(b.req);
-        return `<button class="btn" type="button" data-act="build" data-a="${k}" ${locked || S.money < b.price ? 'disabled' : ''}><span>${b.name}<small>${locked ? 'Нужно исследование' : b.desc}${b.kw ? ` Потребляет ${b.kw} кВт.` : ''}</small></span><span class="price">${fmt$(b.price)}</span></button>`;
+        const price = b.price + (b.inRack ? BUILD.rack.price : 0);
+        return `<button class="btn" type="button" data-act="build" data-a="${k}" ${locked || S.money < price ? 'disabled' : ''}><span>${b.inRack ? `Стойка с коммутатором ${b.name.split(' ')[1]}` : b.name}<small>${locked ? 'Нужно исследование' : b.desc}${b.kw ? ` Потребляет ${b.kw} кВт.` : ''}</small></span><span class="price">${fmt$(price)}</span></button>`;
       }).join('')}</div>`;
     }
     if (t.k === 'rack') {
@@ -198,17 +208,16 @@ const TAB = {
       const fire = t.fire ? `<button class="btn hot" type="button" data-act="extinguish">ТУШИТЬ ПОЖАР</button>` : '';
       const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${capsText(MODELS[m])}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать · ${fmt$(n >= working ? priceOf(m) * 0.1 : sellOf(m))}</button></div>`).join('');
       const stockBtns = Object.keys(S.stock).filter((k) => S.stock[k] > 0 && MODELS[k]).map((k) => `<button class="btn" type="button" data-act="fromstock" data-a="${k}"><span>${MODELS[k].name}<small>${capsText(MODELS[k])} · со склада, есть ${S.stock[k]}</small></span><span class="price">поставить</span></button>`).join('');
-      const shop = t.s.length < RACK_SLOTS ? `<h3>Добавить сервер (${t.s.length}/${RACK_SLOTS})</h3>${stockBtns ? `<div class="shop">${stockBtns}</div>` : ''}<p class="muted">Готовые решения от вендора — ставятся сразу, но дороже сборки.</p><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].custom && (!MODELS[k].req || hasTech(MODELS[k].req))).map((k) => {
-        const m = MODELS[k], free = RACK_SLOTS - t.s.length, pr = priceOf(k);
+      const shop = slotsFree(t) > 0 ? `<h3>Добавить сервер (занято ${slotsUsed(t)} из ${RACK_SLOTS} мест)</h3>${stockBtns ? `<div class="shop">${stockBtns}</div>` : ''}<p class="muted">Готовые решения от вендора — ставятся сразу, но дороже сборки.</p><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].custom && (!MODELS[k].req || hasTech(MODELS[k].req))).map((k) => {
+        const m = MODELS[k], free = slotsFree(t), pr = priceOf(k);
         return `<div class="row"><button class="btn" type="button" data-act="addsrv" data-a="${k}" ${S.money < pr ? 'disabled' : ''} style="flex:1"><span>${m.name} ${typeTag(m.type)}<small>${m.cap} ${TYPES[m.type].unit} · тепло ${m.heat} · ${m.kw} кВт</small></span><span class="price">${fmt$(pr)}</span></button>${free > 1 ? `<button class="btn sm" type="button" data-act="fillrack" data-a="${k}" ${S.money < pr ? 'disabled' : ''}>×${free}</button>` : ''}</div>`;
       }).join('')}</div>` : '<p class="muted">Стойка заполнена.</p>';
       return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}${rackNetHtml(t, h, i)}
         <dl class="kv"><dt>Износ</dt><dd class="${(t.age || 0) > 480 ? 'warn' : ''}">${wearText(t)}</dd><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
         ${t.broken ? `<button class="btn primary" type="button" data-act="repair" ${S.money < repairCost ? 'disabled' : ''}>Починить сейчас · ${fmt$(repairCost)}</button>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
-        <div class="slots">${slots || '<p class="muted">Пустая стойка.</p>'}</div>${shop}
+        <div class="slots">${slots || '<p class="muted">Серверов нет.</p>'}</div>${shop}${switchHtml(t, h, i)}
         <button class="btn danger" type="button" data-act="demolish">Демонтировать стойку · +${fmt$(refund(t))}</button>`;
     }
-    if (isSwitch(t)) return switchHtml(t, h, i, where);
     const b = BUILD[t.k];
     return `<h3>${where}</h3><p class="ttl">${b.name}</p><p class="muted">${b.desc}</p>${b.kw ? `<dl class="kv"><dt>Потребление</dt><dd>${b.kw} кВт</dd></dl>` : ''}<button class="btn danger" type="button" data-act="demolish">Демонтировать · +${fmt$(refund(t))}</button>`;
   },

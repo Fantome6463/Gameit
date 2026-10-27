@@ -94,7 +94,7 @@ function draw(now, frac) {
         if (Math.floor(now / 500) % 2) { ctx.fillStyle = COL.bad; ctx.font = `800 ${Math.max(10, T * 0.3)}px JetBrains Mono, monospace`; ctx.fillText('!', x + T * 0.32, y - T * 0.3); }
         return;
       }
-      if (t.link === undefined) return;
+      if (t.link === undefined || t.link === i) return;
       const sx = O + (t.link % D.w) * T + T / 2, sy = O + Math.floor(t.link / D.w) * T + T / 2;
       ctx.save();
       if (t.cable === 'laying') { ctx.setLineDash([4, 4]); ctx.lineDashOffset = -now / 40; ctx.strokeStyle = 'rgba(242,178,74,.9)'; }
@@ -165,6 +165,21 @@ function drawPerson(x, y, now, walking, shirt, hurry, sitting) {
   if (hurry) { ctx.fillStyle = COL.bad; ctx.fillRect(x + s * 0.6, y - s * 1.5 + bob, s * 0.5, s * 0.9); }
 }
 
+// Коммутатор в верхних местах стойки: корпус, ряд портов (горят занятые), рамка мигает, пока он не настроен.
+function drawRackSwitch(t, x, y, w, h, now, dark, i) {
+  const spec = SW[t.net.k], cfg = t.net.cfg;
+  ctx.fillStyle = '#1b2733'; ctx.fillRect(x, y + 0.5, w, h - 1);
+  const col = cfg === 'ok' ? null : cfg === 'bad' ? COL.bad : cfg === 'work' ? COL.accent : COL.warn;
+  ctx.strokeStyle = col && Math.floor(now / 400) % 2 ? col : '#3a4958'; ctx.lineWidth = col ? 2 : 1;
+  ctx.strokeRect(x + 0.5, y + 1, w - 1, h - 2);
+  const rows = spec.slots, per = 8, used = portsUsed(S.halls[S.cur].grid, i);
+  const pw = (w - 4) / per, ph = Math.max(2, (h - 4) / rows - 2);
+  for (let k = 0; k < per * rows; k++) {
+    const on = k < Math.ceil((used / spec.ports) * per * rows);
+    ctx.fillStyle = dark ? '#111' : on ? (Math.sin(now / 80 + k) > -0.4 ? COL.led : '#16402b') : '#0b1015';
+    ctx.fillRect(x + 2 + (k % per) * pw, y + 2 + Math.floor(k / per) * (ph + 2), Math.max(2, pw - 2), ph);
+  }
+}
 function drawTile(t, x, y, now, dark, i) {
   const p = T * 0.1;
   if (t.k === 'rack') {
@@ -174,10 +189,12 @@ function drawTile(t, x, y, now, dark, i) {
     ctx.strokeRect(x + p + 0.5, y + p + 0.5, T - 2 * p - 1, T - 2 * p - 1);
     const sh = (T - 2 * p - 4) / RACK_SLOTS;
     const working = t.s.length - t.broken;
-    for (let n = 0; n < RACK_SLOTS; n++) {
+    const top = t.net ? SW[t.net.k].slots : 0;
+    if (t.net) drawRackSwitch(t, x + p + 2, y + p + 2, T - 2 * p - 4, sh * top, now, dark, i);
+    for (let n = top; n < RACK_SLOTS; n++) {
       const sy = y + p + 2 + n * sh;
       ctx.fillStyle = COL.slot; ctx.fillRect(x + p + 2, sy + 0.5, T - 2 * p - 4, sh - 1);
-      const m = t.s[n];
+      const m = t.s[n - top];
       if (!m) continue;
       const M = MODELS[m];
       ctx.fillStyle = COL[M.type]; ctx.globalAlpha = dark ? 0.3 : 0.85;
@@ -185,7 +202,7 @@ function drawTile(t, x, y, now, dark, i) {
       ctx.globalAlpha = 1;
       let led = COL.led, on = true;
       if (dark) on = false;
-      else if (n >= working) { led = COL.bad; on = Math.floor(now / 300) % 2 === 0; }
+      else if (n - top >= working) { led = COL.bad; on = Math.floor(now / 300) % 2 === 0; }
       else on = Math.sin(now / (60 + ((i * 7 + n * 13) % 50)) + n) > -0.3;
       if (on) { ctx.fillStyle = led; ctx.fillRect(x + T - p - 3 - sh * 0.5, sy + sh * 0.25, Math.max(2, sh * 0.4), Math.max(2, sh * 0.5)); }
     }
@@ -243,19 +260,6 @@ function drawTile(t, x, y, now, dark, i) {
     ctx.lineTo(x + T * 0.42, y + T * 0.82); ctx.lineTo(x + T * 0.68, y + T * 0.44); ctx.lineTo(x + T * 0.5, y + T * 0.44); ctx.closePath(); ctx.fill();
     return;
   }
-  if (SW[t.k]) {
-    ctx.fillStyle = '#1b2733'; ctx.fillRect(x + p, y + T * 0.3, T - 2 * p, T * 0.4);
-    const col = t.cfg === 'ok' ? null : t.cfg === 'bad' ? COL.bad : t.cfg === 'work' ? COL.accent : COL.warn;
-    ctx.strokeStyle = col && Math.floor(now / 400) % 2 ? col : '#3a4958'; ctx.lineWidth = col ? 2 : 1;
-    ctx.strokeRect(x + p + 0.5, y + T * 0.3 + 0.5, T - 2 * p - 1, T * 0.4 - 1);
-    const n = SW[t.k].ports > 8 ? 16 : 8, used = portsUsed(S.halls[S.cur].grid, i);
-    for (let k = 0; k < n; k++) {
-      const on = k < Math.ceil((used / SW[t.k].ports) * n);
-      ctx.fillStyle = dark ? '#111' : on ? (Math.sin(now / 80 + k) > -0.4 ? COL.led : '#16402b') : '#0b1015';
-      ctx.fillRect(x + p + 3 + (k % 8) * ((T - 2 * p - 6) / 8), y + T * (k < 8 ? 0.4 : 0.55), Math.max(2, (T - 2 * p - 6) / 8 - 2), Math.max(2, T * 0.07));
-    }
-    return;
-  }
   if (t.k === 'gas') {
     ctx.fillStyle = '#4a545e'; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
     const fl = 0.8 + 0.2 * Math.sin(now / 120);
@@ -293,7 +297,7 @@ function paintAt(i) {
   if (!H.open) return;
   const t = H.grid[i];
   if (S.tool === 'demolish') { if (t) { S.sel = { h: S.cur, i }; ACT.demolish(); S.sel = null; } }
-  else if (!t) place(S.tool, S.cur, i);
+  else if (!t || (BUILD[S.tool] && BUILD[S.tool].inRack && t.k === 'rack' && !t.net)) place(S.tool, S.cur, i);
   renderUI();
 }
 const stopPaint = () => { painting = false; lastPaint = -1; };

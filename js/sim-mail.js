@@ -73,8 +73,8 @@ const MSGS = [
     yes: ['Беру партию', () => {
       if (freeSlots() < 6 || !spend(2000)) return;
       let left = 6, bad = 0;
-      allRacks((t) => t.s.length < RACK_SLOTS).forEach(({ t }) => {
-        while (left > 0 && t.s.length < RACK_SLOTS) {
+      allRacks((t) => slotsFree(t) > 0).forEach(({ t }) => {
+        while (left > 0 && slotsFree(t) > 0) {
           if (Math.random() < 0.45) { t.s.push('b2'); t.broken++; t.lastBroken = t.broken; bad++; }
           else t.s.splice(t.s.length - t.broken, 0, 'b2');
           left--;

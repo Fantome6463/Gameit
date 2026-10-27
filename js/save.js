@@ -4,8 +4,17 @@
 // и добавьте MIGRATIONS[старая версия] — функцию, которая доводит старое сохранение до следующей версии.
 // Новые поля с простыми значениями по умолчанию миграции не нужны: их подставит newState().
 const SAVE_KEY = 'cod-magnat.save.v1';
-const SAVE_VERSION = 1;
-const MIGRATIONS = {};
+const SAVE_VERSION = 2;
+const MIGRATIONS = {
+  // v1 → v2: коммутаторы стояли на отдельных клетках, теперь они внутри стоек.
+  // Клетка с коммутатором становится стойкой с ним; подключённые стойки ссылаются на ту же клетку.
+  1(d) {
+    (d.halls || []).forEach((H) => H.grid.forEach((t, i) => {
+      if (!t || !SW[t.k]) return;
+      H.grid[i] = Object.assign(mkRack(), { net: { k: t.k, cfg: t.cfg || 'raw' }, link: i, cable: 'ok' });
+    }));
+  },
+};
 
 function save() {
   if (S.over) return;

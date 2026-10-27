@@ -53,7 +53,7 @@ function asmTick() {
 function installStock(t, hi, mid, max = RACK_SLOTS) {
   let n = 0;
   const M = MODELS[mid];
-  while ((S.stock[mid] || 0) > 0 && t.s.length < RACK_SLOTS && n < max) {
+  while ((S.stock[mid] || 0) > 0 && slotsFree(t) > 0 && n < max) {
     const st = hallStats(hi);
     if (st.load + M.kw > st.cap) { if (!n) toast('Не хватает мощности зала', 'bad'); break; }
     t.s.splice(t.s.length - t.broken, 0, mid);
@@ -66,7 +66,7 @@ function placeKit(kit, hi) {
   const H = S.halls[hi], D = HALLS[hi];
   const cools = kit.cools || 1;
   const r = BUILD[kit.cool].r;
-  const kw = kit.racks * kit.per * MODELS[kit.model].kw + cools * BUILD[kit.cool].kw + BUILD[kit.sw].kw;
+  const kw = kitServers(kit) * MODELS[kit.model].kw + cools * BUILD[kit.cool].kw + BUILD[kit.sw].kw;
   const st = hallStats(hi);
   if (st.load + kw > st.cap) return 'Не хватает мощности зала';
   for (let c = 0; c < D.w * D.h; c++) {
@@ -75,22 +75,24 @@ function placeKit(kit, hi) {
     for (let j = 0; j < D.w * D.h; j++) if (j !== c && !H.grid[j] && tdist(D, c, j) <= r) near.push(j);
     near.sort((a, b) => tdist(D, c, a) - tdist(D, c, b));
     if (near.length < kit.racks + cools) continue;
-    const swTile = near.find((j) => tdist(D, c, j) === 1);
-    if (swTile === undefined) continue;
-    const rest = near.filter((j) => j !== swTile);
-    const extraCools = rest.slice(0, cools - 1);
-    const racks = rest.slice(cools - 1, cools - 1 + kit.racks);
+    const extraCools = near.slice(0, cools - 1);
+    const racks = near.slice(cools - 1, cools - 1 + kit.racks);
+    const swTile = racks[0];
     if (racks.length < kit.racks || racks.some((j) => tdist(D, j, swTile) > SW[kit.sw].range)) continue;
     H.grid[c] = { k: kit.cool };
     extraCools.forEach((j) => { H.grid[j] = { k: kit.cool }; });
-    H.grid[swTile] = { k: kit.sw, cfg: 'ok' };
-    racks.forEach((j) => { H.grid[j] = Object.assign(mkRack(Array(kit.per).fill(kit.model)), { link: swTile, cable: 'ok' }); });
+    racks.forEach((j, n) => {
+      const per = n ? kit.per : Math.min(kit.per, RACK_SLOTS - SW[kit.sw].slots);
+      H.grid[j] = Object.assign(mkRack(Array(per).fill(kit.model)), { link: swTile, cable: 'ok' });
+    });
+    H.grid[swTile].net = { k: kit.sw, cfg: 'ok' };
     refreshHall(hi);
     return null;
   }
   return 'Нет свободного места под модуль';
 }
-const kitPrice = (kit) => Math.round((kit.racks * (BUILD.rack.price + kit.per * priceOf(kit.model)) + (kit.cools || 1) * BUILD[kit.cool].price + BUILD[kit.sw].price) * 1.25 + 1500);
+const kitServers = (kit) => kit.racks * kit.per - Math.max(0, kit.per + SW[kit.sw].slots - RACK_SLOTS);
+const kitPrice = (kit) => Math.round((kit.racks * BUILD.rack.price + kitServers(kit) * priceOf(kit.model) + (kit.cools || 1) * BUILD[kit.cool].price + BUILD[kit.sw].price) * 1.25 + 1500);
 function techMult(type) {
   if (type === 'cpu') return (hasTech('virt') ? 1.2 : 1) * (hasTech('k8s') ? 1.25 : 1) * (1 + S.capBonus);
   if (type === 'sto') return hasTech('k8s') ? 1.15 : 1;
@@ -101,7 +103,7 @@ function hallStats(hi) {
   let load = 0, cap = D.kw, backup = 0;
   H.grid.forEach((t) => {
     if (!t) return;
-    if (t.k === 'rack') t.s.forEach((m) => { load += MODELS[m].kw; });
+    if (t.k === 'rack') { t.s.forEach((m) => { load += MODELS[m].kw; }); if (t.net) load += BUILD[t.net.k].kw; }
     else { const b = BUILD[t.k]; load += b.kw || 0; cap += b.power || 0; backup += b.backup || 0; }
   });
   return { load, cap, backup };
