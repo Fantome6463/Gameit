@@ -140,6 +140,13 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 .tag.good { background: rgba(79, 209, 139, .2); color: #8fe6b5; }
 .tag.vip { background: rgba(242, 178, 74, .22); color: #f6cd85; }
 .curve { width: 100%; height: 70px; display: block; }
+.cfg { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+.cfg select { min-height: 34px; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font: 500 13px var(--f-mono); }
+.rules { margin: 0; padding: 10px 12px 10px 28px; background: var(--bay); border-radius: 4px; display: grid; gap: 4px; font-size: 13px; color: var(--fg); }
+.facts { font: 500 12.5px var(--f-mono); color: var(--accent); }
+.stepper { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--f-mono); }
+.part { display: grid; gap: 6px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; }
+.part .seg { flex-wrap: wrap; }
 .mkt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .mkt div { padding: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; display: grid; gap: 2px; }
 .mkt b { font: 600 16px var(--f-mono); }
@@ -162,10 +169,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 /* Side */
 .side { display: grid; gap: 12px; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
-.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); border-bottom: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); border-bottom: 1px solid var(--line); }
 .tabs button {
   padding: 9px 6px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; white-space: nowrap;
-  font: 600 12px var(--f-body); color: var(--dim);
+  font: 600 11.5px var(--f-body); color: var(--dim);
 }
 .tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
 .tabs button sup { font: 600 9px var(--f-mono); color: var(--accent); }
@@ -326,6 +333,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     ups: { name: 'ИБП', price: 1000, kw: 0, backup: 25, short: '25 кВт', desc: 'Держит 25 кВт нагрузки зала при отключении электричества.' },
     gen: { name: 'Дизель', price: 6000, kw: 0, backup: 150, req: 'diesel', short: '150 кВт', desc: 'Генератор держит 150 кВт при отключении.' },
     trafo: { name: 'Трансформатор', price: 2500, kw: 0, power: 60, short: '+60 кВт', desc: 'Поднимает лимит мощности зала на 60 кВт.' },
+    sw: { name: 'Коммутатор ToR', price: 1200, kw: 0.3, short: '8 портов', desc: 'Подключает до 8 стоек на расстоянии до 3 клеток. После установки его нужно настроить.' },
+    sw2: { name: 'Коммутатор Spine', price: 6000, kw: 0.8, req: 'spine', short: '32 порта', desc: 'Подключает до 32 стоек на расстоянии до 6 клеток. Требует настройки.' },
     gas: { name: 'Газовая турбина', price: 12000, kw: 0, backup: 80, gas: 80, req: 'gas', short: '80 кВт', desc: 'Вырабатывает до 80 кВт по $0,30/кВт·ч, когда сеть дороже. При отключении держит 80 кВт.' },
     heatx: { name: 'Теплообменник', price: 6000, kw: 1, cool: 20, r: 2, heatx: true, req: 'heatreuse', short: 'продаёт тепло', desc: 'Снимает 20 ед. тепла в радиусе 2 и продаёт его городской котельной. На севере тепло стоит вдвое дороже.' },
     miner: { name: 'ASIC-ферма соседей', price: 0, kw: 6, hidden: true, desc: 'Чужая майнинг-ферма. Платит $30 в час, но выдаёт 40 ед. тепла и забирает охлаждение у соседних стоек.' },
@@ -351,6 +360,48 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   ];
   const BW = { web: 0.15, game: 0.25, bank: 0.05, backup: 0.06, media: 0.12, ai: 0.02, render: 0.03 };
   const GAS_FUEL = 0.3, FIXED_PRICE = 0.5;
+  const SW = { sw: { ports: 8, range: 3 }, sw2: { ports: 32, range: 6 } };
+  const PARTS = {
+    ch: {
+      c1: { name: 'Корпус 1U', price: 60, sockets: 1, bays: 2, gpus: 0, kw: 0.05, heat: 0.3 },
+      c2: { name: 'Корпус 2U', price: 120, sockets: 2, bays: 8, gpus: 1, kw: 0.08, heat: 0.5 },
+      c4: { name: 'Корпус 4U', price: 250, sockets: 4, bays: 24, gpus: 4, kw: 0.12, heat: 0.8 },
+    },
+    cpu: {
+      p1: { name: 'Ядро-12', cpu: 12, heat: 2.5, kw: 0.25, price: 140, tier: 1, hw: 'cpu' },
+      p2: { name: 'Ядро-32', cpu: 30, heat: 4, kw: 0.4, price: 480, tier: 2, req: 'silver', hw: 'cpu' },
+      p3: { name: 'Ядро-96', cpu: 75, heat: 6.5, kw: 0.7, price: 1600, tier: 3, req: 'platinum', hw: 'cpu' },
+    },
+    ram: {
+      r1: { name: '128 ГБ', mult: 0.85, price: 40, hw: 'cpu' },
+      r2: { name: '512 ГБ', mult: 1, price: 160, hw: 'cpu' },
+      r3: { name: '2 ТБ', mult: 1.15, price: 600, req: 'virt', hw: 'cpu' },
+    },
+    disk: {
+      d0: { name: 'нет' },
+      d1: { name: 'HDD 8 ТБ', sto: 8, heat: 0.15, kw: 0.01, price: 45, tier: 1, hw: 'sto' },
+      d2: { name: 'NVMe 16 ТБ', sto: 16, heat: 0.2, kw: 0.015, price: 260, tier: 2, req: 'flash', hw: 'sto' },
+    },
+    gpu: {
+      g0: { name: 'нет' },
+      g1: { name: 'Ускоритель A', gpu: 2, heat: 3.5, kw: 0.55, price: 800, tier: 2, req: 'gpu', hw: 'gpu' },
+      g2: { name: 'Ускоритель H', gpu: 8, heat: 6, kw: 1.0, price: 3800, tier: 3, req: 'gpu2', hw: 'gpu' },
+    },
+  };
+  const KITS = [
+    { id: 'k1', name: 'Модуль «Старт»', desc: '2 стойки по 6 Bronze, кондиционер, коммутатор ToR.', racks: 2, model: 'b1', per: 6, cool: 'crac', sw: 'sw' },
+    { id: 'k2', name: 'Модуль хранения', desc: '2 стойки по 6 дисковых полок, кондиционер, ToR.', racks: 2, model: 's1', per: 6, cool: 'crac', sw: 'sw' },
+    { id: 'k3', name: 'Ряд Silver', desc: '4 стойки по 6 Silver, чиллер, ToR.', racks: 4, model: 'b2', per: 6, cool: 'chiller', sw: 'sw', req: 'silver' },
+    { id: 'k4', name: 'GPU-под', desc: '3 стойки по 3 GPU-узла, чиллер, ToR.', racks: 3, model: 'g1', per: 3, cool: 'chiller', sw: 'sw', req: 'gpu' },
+    { id: 'k5', name: 'Ряд Platinum', desc: '6 стоек по 6 Platinum, 2 чиллера, Spine.', racks: 6, model: 'b3', per: 6, cool: 'chiller', cools: 2, sw: 'sw2', req: 'platinum' },
+  ];
+  const CFG_OPTS = {
+    vlan: ['10', '20', '30', '40', '50', '60'],
+    mtu: ['1500', '9000'],
+    uplink: ['access', 'trunk'],
+    stp: ['вкл', 'выкл'],
+    speed: ['10G', '25G', '100G'],
+  };
   const CERTS = [
     { id: 'tier3', name: 'Tier III', price: 20000, desc: 'Резервирование питания. Контракты с SLA 99.9% платят на 20% больше.',
       need: 'Во всех залах резерв ИБП/дизелей не меньше нагрузки',
@@ -402,6 +453,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     { id: 'ngfw', name: 'Межсетевой экран NGFW', price: 15000, days: 1.5, desc: 'Защита от атак +20.' },
     { id: 'offbackup', name: 'Резервные копии вне площадки', price: 20000, days: 2, desc: 'Шифровальщик блокирует зал на 12 ч вместо 48, штрафы за утечки −50%.' },
     { id: 'zerotrust', name: 'Zero Trust', price: 120000, days: 4, req: ['ngfw'], desc: 'Защита от атак +30.' },
+    { id: 'spine', name: 'Spine-коммутаторы', price: 25000, days: 2, req: ['fiber'], desc: 'Коммутаторы на 32 порта с дальностью 6 клеток.' },
+    { id: 'sdn', name: 'Программно-определяемая сеть', price: 90000, days: 3, req: ['spine'], desc: 'Новые коммутаторы настраиваются сами.' },
     { id: 'aiops', name: 'AIOps', price: 500000, days: 6, req: ['k8s', 'gpu'], desc: 'Поломки −60%, админы чинят вдвое быстрее.' },
   ];
   const STAFF = {
@@ -409,6 +462,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     eng: { name: 'Инженер-климатовик', pay: 300, desc: '+8% к охлаждению во всех залах за каждого.', max: 10 },
     guard: { name: 'Безопасник', pay: 250, desc: 'Тушит пожары за час и гасит DDoS на 15% за каждого.', max: 6 },
     sales: { name: 'Менеджер продаж', pay: 350, desc: '+1 предложение и +5% к оплате новых контрактов.', max: 5 },
+    neteng: { name: 'Сетевой инженер', pay: 350, desc: 'Сам прокладывает кабели к новым стойкам и без ошибок настраивает коммутаторы.', max: 6 },
+    tech: { name: 'Сборщик серверов', pay: 250, desc: 'Собирает серверы из комплектующих: по серверу в час каждый.', max: 8 },
     soc: { name: 'SOC-аналитик', pay: 400, desc: 'Круглосуточный мониторинг атак: +15 к защите за каждого.', max: 4 },
     buyer: { name: 'Завхоз', pay: 500, desc: 'Сам докупает серверы (и стойки рядом с кондиционерами), чтобы мощности хватало на все контракты с запасом. Правила задаются ниже.', max: 1 },
     acct: { name: 'Аккаунт-менеджер', pay: 450, desc: 'Сам подписывает контракты, на которые хватает свободной мощности (с запасом 10%). Самые выгодные — первыми.', max: 1 },
@@ -479,11 +534,12 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   function newState() {
     const halls = HALLS.map((h, i) => ({ open: i === 0, grid: Array(h.w * h.h).fill(null), dark: false, load: 0, cap: h.kw, backup: 0 }));
     const g = halls[0].grid;
-    g[1 * 5 + 1] = mkRack(['b1', 'b1']);
+    g[1 * 5 + 1] = Object.assign(mkRack(['b1', 'b1']), { link: 2 * 5 + 1, cable: 'ok' });
     g[1 * 5 + 2] = { k: 'crac' };
+    g[2 * 5 + 1] = { k: 'sw', cfg: 'ok' };
     const st = {
       v: 1, day: 1, hour: 8, money: 3000, rep: 10, speed: 1, paused: false, started: false, over: false, won: false,
-      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0 }, jobs: [],
+      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0, neteng: 0, tech: 0 }, jobs: [],
       contracts: [], offers: [], nextId: 1, event: null, nextEvent: 44, goal: 0,
       stats: { signed: 0, done: 0, failed: 0, bestDay: 0, tenders: 0 },
       today: { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 }, history: [], hourly: [],
@@ -495,6 +551,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       rivals: [{ name: 'ГигаХост', rep: 28, bought: false }, { name: 'Облако-24', rep: 42, bought: false }, { name: 'ООО «Сервер на балконе»', rep: 12, bought: false }],
       policy: { headroom: 0.25, reserve: 5000, racks: true },
       hw: { cpu: 1, sto: 1, gpu: 1 }, certs: {}, insured: false,
+      designs: [], stock: {}, asm: [], netJobs: [], cfgTarget: null,
+      draft: { ch: 'c1', cpu: 'p1', ncpu: 1, ram: 'r1', disk: 'd0', ndisk: 0, gpu: 'g0', ngpu: 0, qty: 1 },
       energy: { tariff: 'spot', next: 'spot', dayF: 1 }, bw: { dem: 0, cap: 10 }, sec: { pentest: 0 }, ipo: null, overReason: '', heatInc: 0,
       autoPause: true,
     };
@@ -502,7 +560,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     S.offers.push(genOffer(true), genOffer(), genOffer());
     return st;
   }
-  function mkRack(s = []) { return { k: 'rack', s, broken: 0, fire: 0, temp: 24, heat: 0, cool: 0, age: 0 }; }
+  function mkRack(s = []) { return { k: 'rack', s, broken: 0, fire: 0, temp: 24, heat: 0, cool: 0, age: 0, link: null, cable: 'none' }; }
   const certOn = (id) => !!(S.certs[id] && S.certs[id].on);
 
   const repLevel = () => clamp(1 + Math.floor(S.rep / 20), 1, 5);
@@ -587,14 +645,185 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   }
 
   // ================= SIMULATION =================
-  function rackCap(t, hallDark) {
+  const capsOf = (M) => M.caps || { [M.type]: M.cap };
+  function rackCap(t, hallDark, grid) {
     const res = { cpu: 0, sto: 0, gpu: 0 };
     if (hallDark || t.fire) return res;
-    const throttle = t.temp > 40 ? 0.6 : t.temp > 32 ? 0.85 : 1;
+    const throttle = (t.temp > 40 ? 0.6 : t.temp > 32 ? 0.85 : 1) * netMult(grid, t);
     const working = t.s.length - t.broken;
-    for (let i = 0; i < working; i++) { const m = MODELS[t.s[i]]; res[m.type] += m.cap * throttle; }
+    for (let i = 0; i < working; i++) { const c = capsOf(MODELS[t.s[i]]); for (const k in c) res[k] += c[k] * throttle; }
     return res;
   }
+  // ----- in-hall network -----
+  const isSwitch = (t) => !!(t && SW[t.k]);
+  const tdist = (D, a, b) => Math.max(Math.abs((a % D.w) - (b % D.w)), Math.abs(Math.floor(a / D.w) - Math.floor(b / D.w)));
+  function netMult(grid, t) {
+    if (t.link === undefined) return 1;
+    if (t.link === null || t.cable !== 'ok') return 0;
+    const sw = grid[t.link];
+    if (!isSwitch(sw)) return 0;
+    return sw.cfg === 'ok' ? 1 : sw.cfg === 'bad' ? 0.6 : 0;
+  }
+  const portsUsed = (grid, si) => grid.reduce((a, t) => a + (t && t.k === 'rack' && t.link === si ? 1 : 0), 0);
+  function switchFor(hi, i) {
+    const H = S.halls[hi], D = HALLS[hi];
+    let best = null;
+    H.grid.forEach((sw, j) => {
+      if (!isSwitch(sw)) return;
+      const d = tdist(D, i, j);
+      if (d > SW[sw.k].range || portsUsed(H.grid, j) >= SW[sw.k].ports) return;
+      if (!best || d < best.d) best = { j, d };
+    });
+    return best;
+  }
+  const manualBusy = () => S.netJobs.some((j) => j.by === 'manual') || S.asm.some((j) => j.by === 'manual');
+  const cableCost = (d, by) => (by === 'contract' ? 150 + 40 * d : 20 * d);
+  function startCable(hi, i, by, quiet) {
+    const t = S.halls[hi].grid[i];
+    if (!t || t.k !== 'rack' || t.link !== null) return false;
+    if (by === 'manual' && manualBusy()) { if (!quiet) toast('Вы уже заняты другой ручной работой', 'bad'); return false; }
+    const sw = switchFor(hi, i);
+    if (!sw) { if (!quiet) toast('Рядом нет коммутатора со свободным портом', 'bad'); return false; }
+    const cost = cableCost(sw.d, by);
+    if (S.money < cost) { if (!quiet) toast('Не хватает денег', 'bad'); return false; }
+    S.money -= cost; S.today.other += cost;
+    t.link = sw.j; t.cable = 'laying';
+    S.netJobs.push({ kind: 'cable', h: hi, i, by, left: by === 'contract' ? 1 : 1 + sw.d });
+    return true;
+  }
+  function startCfg(hi, i, by) {
+    const sw = S.halls[hi].grid[i];
+    if (!isSwitch(sw) || sw.cfg === 'work') return false;
+    if (by === 'contract') { if (!spend(500)) return false; }
+    sw.cfg = 'work';
+    S.netJobs.push({ kind: 'cfg', h: hi, i, by, left: by === 'contract' ? 1 : 3 });
+    return true;
+  }
+  function netTick() {
+    S.netJobs = S.netJobs.filter((j) => {
+      const t = S.halls[j.h].grid[j.i];
+      return j.kind === 'cable' ? t && t.k === 'rack' && t.cable === 'laying' : isSwitch(t) && t.cfg === 'work';
+    });
+    S.netJobs.forEach((j) => {
+      if (--j.left > 0) return;
+      const t = S.halls[j.h].grid[j.i];
+      if (j.kind === 'cable') { t.cable = 'ok'; if (j.by === 'manual') log(`Вы проложили кабель к стойке ${tileName(j.h, j.i)}`, 'good'); }
+      else { t.cfg = 'ok'; log(`Коммутатор ${tileName(j.h, j.i)} настроен`, 'good'); }
+      j.done = true;
+    });
+    S.netJobs = S.netJobs.filter((j) => !j.done);
+    if (hasTech('sdn')) S.halls.forEach((H) => H.grid.forEach((t) => { if (isSwitch(t) && t.cfg === 'raw') t.cfg = 'ok'; }));
+    let free = S.staff.neteng - S.netJobs.filter((j) => j.by === 'eng').length;
+    if (free <= 0) return;
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      H.grid.forEach((t, i) => { if (free > 0 && isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad') && startCfg(hi, i, 'eng')) free--; });
+    });
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      H.grid.forEach((t, i) => { if (free > 0 && t && t.k === 'rack' && t.link === null && startCable(hi, i, 'eng', true)) free--; });
+    });
+  }
+  function cfgAnswer(hi) {
+    const H = S.halls[hi];
+    let sto = false, tier = 1;
+    H.grid.forEach((t) => { if (t && t.k === 'rack') t.s.forEach((m) => { const M = MODELS[m]; if (capsOf(M).sto) sto = true; tier = Math.max(tier, M.tier); }); });
+    const sws = H.grid.filter(isSwitch).length;
+    return { vlan: String((hi + 1) * 10), mtu: sto ? '9000' : '1500', uplink: 'trunk', stp: sws > 1 ? 'вкл' : 'выкл', speed: ['10G', '25G', '100G'][tier - 1] };
+  }
+
+  // ----- server assembly -----
+  function designSpec(d) {
+    const ch = PARTS.ch[d.ch], cpu = PARTS.cpu[d.cpu], ram = PARTS.ram[d.ram], disk = PARTS.disk[d.disk], gpu = PARTS.gpu[d.gpu];
+    const caps = { cpu: Math.round(d.ncpu * cpu.cpu * ram.mult), sto: d.ndisk * (disk.sto || 0), gpu: d.ngpu * (gpu.gpu || 0) };
+    const heat = ch.heat + d.ncpu * cpu.heat + d.ndisk * (disk.heat || 0) + d.ngpu * (gpu.heat || 0);
+    const kw = ch.kw + d.ncpu * cpu.kw + d.ndisk * (disk.kw || 0) + d.ngpu * (gpu.kw || 0);
+    const hwp = (part) => (part.price || 0) * (part.hw ? S.hw[part.hw] : 1);
+    const price = Math.round(hwp(ch) + d.ncpu * hwp(cpu) + hwp(ram) + d.ndisk * hwp(disk) + d.ngpu * hwp(gpu));
+    const tier = Math.max(cpu.tier, disk.tier || 1, gpu.tier || 1);
+    const val = { cpu: caps.cpu * TYPES.cpu.rate, sto: caps.sto * TYPES.sto.rate, gpu: caps.gpu * TYPES.gpu.rate };
+    const type = Object.keys(val).sort((a, b) => val[b] - val[a])[0];
+    for (const k in caps) if (!caps[k]) delete caps[k];
+    const errs = [];
+    if (d.ncpu < 1 || d.ncpu > ch.sockets) errs.push(`процессоров должно быть от 1 до ${ch.sockets}`);
+    if (d.ndisk > ch.bays) errs.push(`в корпус влезает до ${ch.bays} дисков`);
+    if (d.ngpu > ch.gpus) errs.push(`в корпус влезает до ${ch.gpus} ускорителей`);
+    [cpu, ram, disk, gpu].forEach((pt) => { if (pt.req && !hasTech(pt.req)) errs.push(`${pt.name}: нужно исследование`); });
+    if (d.disk === 'd0' && d.ndisk) errs.push('выберите тип дисков');
+    if (d.gpu === 'g0' && d.ngpu) errs.push('выберите тип ускорителей');
+    return { caps, cap: caps[type] || 0, type, heat: Math.round(heat * 10) / 10, kw: Math.round(kw * 100) / 100, price, tier, errs };
+  }
+  const partsKey = (d) => [d.ch, d.cpu, d.ncpu, d.ram, d.disk, d.ndisk, d.gpu, d.ngpu].join('|');
+  function registerDesign(ds) {
+    MODELS[`d${ds.id}`] = { name: ds.name, type: ds.spec.type, cap: ds.spec.cap, caps: ds.spec.caps, heat: ds.spec.heat, kw: ds.spec.kw, price: ds.spec.price, tier: ds.spec.tier, custom: true };
+  }
+  function designFor(d) {
+    const key = partsKey(d);
+    let ds = S.designs.find((x) => x.key === key);
+    if (!ds) {
+      const spec = designSpec(d);
+      ds = { id: S.nextId++, key, parts: { ...d }, spec, name: `Сборка №${S.designs.length + 1} · ${PARTS.ch[d.ch].name.split(' ')[1]}` };
+      S.designs.push(ds);
+      registerDesign(ds);
+    }
+    return ds;
+  }
+  function asmTick() {
+    let free = S.staff.tech;
+    S.asm.forEach((j) => {
+      if (j.by === 'tech') {
+        const k = Math.min(j.n, free);
+        if (k > 0) { S.stock[j.mid] = (S.stock[j.mid] || 0) + k; j.n -= k; free -= k; }
+      } else if (--j.left <= 0) {
+        const k = j.by === 'contract' ? j.n : 1;
+        S.stock[j.mid] = (S.stock[j.mid] || 0) + k; j.n -= k;
+        if (j.n > 0) j.left = 2;
+      }
+      if (j.n <= 0) { j.done = true; log(`Собрано: ${MODELS[j.mid].name}`, 'good'); }
+    });
+    S.asm = S.asm.filter((j) => !j.done);
+  }
+  function installStock(t, hi, mid, max = RACK_SLOTS) {
+    let n = 0;
+    const M = MODELS[mid];
+    while ((S.stock[mid] || 0) > 0 && t.s.length < RACK_SLOTS && n < max) {
+      const st = hallStats(hi);
+      if (st.load + M.kw > st.cap) { if (!n) toast('Не хватает мощности зала', 'bad'); break; }
+      t.s.splice(t.s.length - t.broken, 0, mid);
+      S.stock[mid]--; n++;
+    }
+    refreshHall(hi);
+    return n;
+  }
+  function placeKit(kit, hi) {
+    const H = S.halls[hi], D = HALLS[hi];
+    const cools = kit.cools || 1;
+    const r = BUILD[kit.cool].r;
+    const kw = kit.racks * kit.per * MODELS[kit.model].kw + cools * BUILD[kit.cool].kw + BUILD[kit.sw].kw;
+    const st = hallStats(hi);
+    if (st.load + kw > st.cap) return 'Не хватает мощности зала';
+    for (let c = 0; c < D.w * D.h; c++) {
+      if (H.grid[c]) continue;
+      const near = [];
+      for (let j = 0; j < D.w * D.h; j++) if (j !== c && !H.grid[j] && tdist(D, c, j) <= r) near.push(j);
+      near.sort((a, b) => tdist(D, c, a) - tdist(D, c, b));
+      if (near.length < kit.racks + cools) continue;
+      const swTile = near.find((j) => tdist(D, c, j) === 1);
+      if (swTile === undefined) continue;
+      const rest = near.filter((j) => j !== swTile);
+      const extraCools = rest.slice(0, cools - 1);
+      const racks = rest.slice(cools - 1, cools - 1 + kit.racks);
+      if (racks.length < kit.racks || racks.some((j) => tdist(D, j, swTile) > SW[kit.sw].range)) continue;
+      H.grid[c] = { k: kit.cool };
+      extraCools.forEach((j) => { H.grid[j] = { k: kit.cool }; });
+      H.grid[swTile] = { k: kit.sw, cfg: 'ok' };
+      racks.forEach((j) => { H.grid[j] = Object.assign(mkRack(Array(kit.per).fill(kit.model)), { link: swTile, cable: 'ok' }); });
+      refreshHall(hi);
+      return null;
+    }
+    return 'Нет свободного места под модуль';
+  }
+  const kitPrice = (kit) => Math.round((kit.racks * (BUILD.rack.price + kit.per * priceOf(kit.model)) + (kit.cools || 1) * BUILD[kit.cool].price + BUILD[kit.sw].price) * 1.25 + 1500);
   function techMult(type) {
     if (type === 'cpu') return (hasTech('virt') ? 1.2 : 1) * (hasTech('k8s') ? 1.25 : 1) * (1 + S.capBonus);
     if (type === 'sto') return hasTech('k8s') ? 1.15 : 1;
@@ -632,7 +861,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const cap = { cpu: 0, sto: 0, gpu: 0 };
     S.halls.forEach((H) => {
       if (!H.open) return;
-      H.grid.forEach((t) => { if (t && t.k === 'rack') { const c = rackCap(t, H.dark); cap.cpu += c.cpu; cap.sto += c.sto; cap.gpu += c.gpu; } });
+      H.grid.forEach((t) => { if (t && t.k === 'rack') { const c = rackCap(t, H.dark, H.grid); cap.cpu += c.cpu; cap.sto += c.sto; cap.gpu += c.gpu; } });
     });
     for (const k in cap) cap[k] *= techMult(k);
 
@@ -852,6 +1081,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 
     // staff jobs
     runJobs();
+    netTick();
+    asmTick();
 
     // events
     if (ev) {
@@ -1346,7 +1577,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 
   // ----- procurement -----
   function bestModel(type) {
-    return Object.keys(MODELS).filter((k) => MODELS[k].type === type && (!MODELS[k].req || hasTech(MODELS[k].req))).sort((a, b) => MODELS[b].cap - MODELS[a].cap)[0];
+    return Object.keys(MODELS).filter((k) => !MODELS[k].custom && MODELS[k].type === type && (!MODELS[k].req || hasTech(MODELS[k].req))).sort((a, b) => MODELS[b].cap - MODELS[a].cap)[0];
   }
   function findSlot(kw) {
     let best = null;
@@ -1355,7 +1586,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       const st = hallStats(hi);
       if (st.load + kw > st.cap) return;
       H.grid.forEach((t, i) => {
-        if (!t || t.k !== 'rack' || t.fire || t.s.length >= RACK_SLOTS || t.temp > 34) return;
+        if (!t || t.k !== 'rack' || t.fire || t.s.length >= RACK_SLOTS || t.temp > 34 || netMult(H.grid, t) === 0 && t.cable !== 'laying') return;
         if (!best || t.temp < best.t.temp) best = { hi, i, t };
       });
     });
@@ -1407,6 +1638,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
             S.money -= BUILD.rack.price; S.today.other += BUILD.rack.price;
             racks++;
             slot = { hi: sp[0], i: sp[1], t: S.halls[sp[0]].grid[sp[1]] };
+            startCable(sp[0], sp[1], S.staff.neteng ? 'eng' : 'contract', true);
           }
         }
         if (!slot) { blocked = true; break; }
@@ -1469,7 +1701,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const st = hallStats(h);
     if (b.kw && st.load + b.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return false; }
     if (!spend(b.price)) return false;
-    H.grid[i] = kind === 'rack' ? mkRack() : { k: kind };
+    H.grid[i] = kind === 'rack' ? mkRack() : SW[kind] ? { k: kind, cfg: hasTech('sdn') ? 'ok' : 'raw' } : { k: kind };
     Sound.build();
     refreshHall(h);
     return true;
@@ -1580,6 +1812,86 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       log(`Получен сертификат ${c.name}`, 'good');
       Sound.win();
     },
+    cable(a) { if (S.sel) startCable(S.sel.h, S.sel.i, a); },
+    swcfg(a) {
+      if (!S.sel) return;
+      if (a === 'manual') { S.cfgTarget = { h: S.sel.h, i: S.sel.i }; S.paused = true; showOverlay('netcfg'); return; }
+      startCfg(S.sel.h, S.sel.i, a);
+    },
+    cfgApply() {
+      const tg = S.cfgTarget;
+      const sw = tg && S.halls[tg.h].grid[tg.i];
+      if (!isSwitch(sw)) { $('#overlay').hidden = true; return; }
+      const ans = cfgAnswer(tg.h);
+      let wrong = 0;
+      Object.keys(CFG_OPTS).forEach((k) => { if ($(`#cfg-${k}`).value !== ans[k]) wrong++; });
+      sw.cfg = wrong ? 'bad' : 'ok';
+      if (wrong) { log(`Коммутатор ${tileName(tg.h, tg.i)}: ошибок в конфигурации — ${wrong}. Потери пакетов, −40% мощности стоек`, 'crit'); Sound.bad(); }
+      else { log(`Вы настроили коммутатор ${tileName(tg.h, tg.i)} без единой ошибки`, 'good'); Sound.win(); }
+      S.cfgTarget = null;
+      $('#overlay').hidden = true; S.paused = false;
+    },
+    cfgCancel() { S.cfgTarget = null; $('#overlay').hidden = true; S.paused = false; },
+    netall(a) {
+      const H = S.halls[S.cur];
+      let n = 0;
+      if (a === 'cable') H.grid.forEach((t, i) => { if (t && t.k === 'rack' && t.link === null && startCable(S.cur, i, 'contract', true)) n++; });
+      else H.grid.forEach((t, i) => { if (isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad') && startCfg(S.cur, i, 'contract')) n++; });
+      if (n) log(`Подрядчик принял заказ: ${a === 'cable' ? 'кабелей' : 'коммутаторов'} — ${n}`);
+      else toast('Нечего делать или не хватает денег', 'bad');
+    },
+    draft(a) {
+      const [k, v] = a.split(':');
+      S.draft[k] = v;
+      const ch = PARTS.ch[S.draft.ch];
+      S.draft.ncpu = clamp(S.draft.ncpu, 1, ch.sockets);
+      S.draft.ndisk = S.draft.disk === 'd0' ? 0 : clamp(S.draft.ndisk || ch.bays, 0, ch.bays);
+      S.draft.ngpu = S.draft.gpu === 'g0' ? 0 : clamp(S.draft.ngpu || ch.gpus, 0, ch.gpus);
+    },
+    draftN(a) {
+      const [k, dv] = a.split(':');
+      const ch = PARTS.ch[S.draft.ch];
+      const lim = { ncpu: [1, ch.sockets], ndisk: [0, S.draft.disk === 'd0' ? 0 : ch.bays], ngpu: [0, S.draft.gpu === 'g0' ? 0 : ch.gpus], qty: [1, 50] }[k];
+      S.draft[k] = clamp(S.draft[k] + Number(dv), lim[0], lim[1]);
+    },
+    assemble(a) {
+      const spec = designSpec(S.draft);
+      if (spec.errs.length) { toast(spec.errs[0], 'bad'); return; }
+      const n = S.draft.qty;
+      if (a === 'manual' && manualBusy()) { toast('Вы уже заняты другой ручной работой', 'bad'); return; }
+      if (a === 'tech' && !S.staff.tech) { toast('Наймите сборщиков во вкладке «Персонал»', 'bad'); return; }
+      const cost = Math.round(spec.price * n * (a === 'contract' ? 1.2 : 1));
+      if (!spend(cost)) return;
+      const ds = designFor(S.draft);
+      ['cpu', 'sto', 'gpu'].forEach((k) => { if (spec.caps[k]) S.hw[k] = Math.min(2.5, S.hw[k] + 0.002 * n * spec.tier); });
+      S.asm.push({ mid: `d${ds.id}`, n, by: a, left: 2 });
+      log(`Заказ на сборку: ${n} × ${ds.name} (${a === 'manual' ? 'своими руками' : a === 'tech' ? 'сборщики' : 'подрядчик'})`);
+    },
+    fromstock(a) {
+      const t = selTile();
+      if (!t || t.k !== 'rack') return;
+      if (installStock(t, S.sel.h, a, 1)) Sound.build();
+    },
+    stockhall() {
+      const H = S.halls[S.cur];
+      let n = 0;
+      Object.keys(S.stock).forEach((mid) => {
+        H.grid.forEach((t) => { if (t && t.k === 'rack' && !t.fire && S.stock[mid] > 0) n += installStock(t, S.cur, mid); });
+      });
+      if (n) { Sound.build(); log(`Со склада установлено серверов: ${n}`); } else toast('Нет свободных слотов или склад пуст', 'bad');
+    },
+    kit(a) {
+      const kit = KITS.find((k) => k.id === a);
+      if (!kit) return;
+      const price = kitPrice(kit);
+      if (S.money < price) { toast('Не хватает денег', 'bad'); return; }
+      const err = placeKit(kit, S.cur);
+      if (err) { toast(err, 'bad'); return; }
+      S.money -= price; S.today.other += price;
+      bumpHw(kit.model, kit.racks * kit.per);
+      log(`Подрядчик смонтировал «${kit.name}» в зале «${HALLS[S.cur].name}» под ключ`, 'good');
+      Sound.win();
+    },
     tariffE(a) { S.energy.next = a; log(`С завтрашнего дня тариф на электричество: ${a === 'fixed' ? 'фиксированный' : 'биржевой'}`); },
     netup(a) {
       const H = S.halls[Number(a)];
@@ -1671,6 +1983,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       const t = selTile(); if (!t) return;
       const back = refund(t);
       S.money += back;
+      if (isSwitch(t)) S.halls[S.sel.h].grid.forEach((r) => { if (r && r.k === 'rack' && r.link === S.sel.i) { r.link = null; r.cable = 'none'; } });
       S.halls[S.sel.h].grid[S.sel.i] = null;
       refreshHall(S.sel.h);
       toast(`Демонтировано, возврат ${fmt$(back)}`);
@@ -1784,7 +2097,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 
     // tabs
     const tabs = [['obj', 'Объект'], ['deals', `Контракты<sup>${S.offers.length}</sup>`], ['tender', `Тендеры${S.tender && !S.tender.bid ? '<sup>!</sup>' : ''}`], ['mail', `Почта${S.inbox.length ? `<sup>${S.inbox.length}</sup>` : ''}`],
-      ['infra', 'Инфра'], ['staff', 'Персонал'], ['tech', 'Развитие'], ['fin', 'Финансы'], ['goals', 'Цели']];
+      ['infra', 'Инфра'], ['asm', `Сборка${S.asm.length ? `<sup>${S.asm.length}</sup>` : ''}`], ['contr', 'Подрядчики'], ['staff', 'Персонал'], ['tech', 'Развитие'], ['fin', 'Финансы']];
     setHTML('#tabs', tabs.map(([k, n]) => `<button type="button" data-act="tab" data-a="${k}" aria-pressed="${S.tab === k}">${n}</button>`).join(''));
     if (!pressing) setHTML('#tab', TAB[S.tab]());
 
@@ -1815,13 +2128,55 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     return `<h3>Рынок</h3><div class="mkt">${['cpu', 'sto', 'gpu'].map(cell).join('')}</div>${tr}`;
   }
   const wearText = (t) => `${Math.round((t.age || 0) / 24)} дн. · поломки ×${(1 + (t.age || 0) / 480).toFixed(1).replace('.', ',')}`;
+  const capsText = (M) => Object.entries(capsOf(M)).map(([k, v]) => `${fmtN(v)} ${TYPES[k].unit}`).join(' + ');
+  function rackNetHtml(t, hi, i) {
+    if (t.link === undefined) return '';
+    if (t.cable === 'laying') {
+      const j = S.netJobs.find((x) => x.kind === 'cable' && x.h === hi && x.i === i);
+      return `<p class="muted warn">Прокладывается кабель${j ? `: ещё ${j.left} ч (${j.by === 'manual' ? 'вы сами' : j.by === 'eng' ? 'инженер' : 'подрядчик'})` : ''}</p>`;
+    }
+    if (t.link !== null) {
+      const sw = S.halls[hi].grid[t.link];
+      const st = !isSwitch(sw) ? 'нет коммутатора' : sw.cfg === 'ok' ? 'работает' : sw.cfg === 'bad' ? 'ошибки в настройке, −40%' : 'коммутатор не настроен';
+      return `<p class="muted ${sw && sw.cfg === 'ok' ? 'ok' : 'warn'}">Сеть: коммутатор ${tileName(hi, t.link)} — ${st}</p>`;
+    }
+    const sw = switchFor(hi, i);
+    if (!sw) return '<p class="crit">Не подключена к сети: стойка не работает. Поставьте коммутатор не дальше 3 клеток (Spine — 6).</p>';
+    const busy = manualBusy();
+    return `<p class="crit">Не подключена к сети: стойка не работает.</p>
+      <div class="btnrow"><button class="btn sm" type="button" data-act="cable" data-a="manual" ${busy || S.money < cableCost(sw.d, 'manual') ? 'disabled' : ''}>Проложить самому · ${fmt$(cableCost(sw.d, 'manual'))}, ${1 + sw.d} ч</button>
+      <button class="btn sm primary" type="button" data-act="cable" data-a="contract" ${S.money < cableCost(sw.d, 'contract') ? 'disabled' : ''}>Подрядчик · ${fmt$(cableCost(sw.d, 'contract'))}, 1 ч</button></div>
+      ${S.staff.neteng ? '<p class="muted">Сетевой инженер подключит её сам, когда освободится.</p>' : ''}`;
+  }
+  function switchHtml(t, hi, i, where) {
+    const used = portsUsed(S.halls[hi].grid, i), spec = SW[t.k];
+    const st = { raw: ['не настроен — подключённые стойки не работают', 'crit'], work: ['идёт настройка', 'warn'], bad: ['ошибки в конфигурации: −40% мощности стоек', 'crit'], ok: ['работает', 'ok'] }[t.cfg];
+    const busy = t.cfg === 'work';
+    return `<h3>${where}</h3><p class="ttl">${BUILD[t.k].name}</p>
+      <dl class="kv"><dt>Порты</dt><dd>${used} / ${spec.ports}</dd><dt>Дальность кабеля</dt><dd>${spec.range} кл.</dd><dt>Состояние</dt><dd class="${st[1]}">${st[0]}</dd></dl>
+      ${t.cfg !== 'ok' ? `<div class="btnrow"><button class="btn sm" type="button" data-act="swcfg" data-a="manual" ${busy ? 'disabled' : ''}>Настроить вручную</button><button class="btn sm primary" type="button" data-act="swcfg" data-a="contract" ${busy || S.money < 500 ? 'disabled' : ''}>Подрядчик · $500, 1 ч</button></div>
+      <p class="muted">Вручную — бесплатно, но нужно свериться с регламентом сети. ${S.staff.neteng ? 'Сетевой инженер настроит сам за 3 ч.' : 'Сетевой инженер настраивает сам.'}</p>` : `<button class="btn sm" type="button" data-act="swcfg" data-a="manual">Перенастроить вручную</button>`}
+      <button class="btn danger" type="button" data-act="demolish">Демонтировать · +${fmt$(refund(t))}</button>`;
+  }
+  function netPanel() {
+    const H = S.halls[S.cur];
+    const loose = H.grid.reduce((a, t, i) => { if (t && t.k === 'rack' && t.link === null) { const sw = switchFor(S.cur, i); if (sw) a.n++, a.cost += cableCost(sw.d, 'contract'); else a.far++; } return a; }, { n: 0, cost: 0, far: 0 });
+    const raw = H.grid.filter((t) => isSwitch(t) && (t.cfg === 'raw' || t.cfg === 'bad')).length;
+    const stockN = Object.values(S.stock).reduce((a, b) => a + b, 0);
+    let html = '';
+    if (loose.n) html += `<button class="btn" type="button" data-act="netall" data-a="cable" ${S.money < loose.cost ? 'disabled' : ''}><span>Подрядчик: проложить кабели к ${loose.n} стойкам<small>за 1 ч</small></span><span class="price">${fmt$(loose.cost)}</span></button>`;
+    if (loose.far) html += `<p class="muted crit">Стоек без коммутатора в радиусе: ${loose.far}. Поставьте коммутатор рядом.</p>`;
+    if (raw) html += `<button class="btn" type="button" data-act="netall" data-a="cfg" ${S.money < raw * 500 ? 'disabled' : ''}><span>Подрядчик: настроить коммутаторы (${raw})<small>за 1 ч</small></span><span class="price">${fmt$(raw * 500)}</span></button>`;
+    if (stockN) html += `<button class="btn primary" type="button" data-act="stockhall"><span>Разместить склад по стойкам зала<small>собранных серверов на складе: ${stockN}</small></span><span class="price">бесплатно</span></button>`;
+    return html;
+  }
   function hallPanel() {
     const hi = S.cur, H = S.halls[hi];
     if (!H.open) return '<h3>Зал не арендован</h3><p class="muted">Арендуйте зал, чтобы строить.</p>';
     const racks = H.grid.filter((t) => t && t.k === 'rack');
     const free = racks.reduce((a, t) => a + RACK_SLOTS - t.s.length, 0);
     const broken = racks.reduce((a, t) => a + t.broken, 0);
-    const models = Object.keys(MODELS).filter((k) => !MODELS[k].req || hasTech(MODELS[k].req));
+    const models = Object.keys(MODELS).filter((k) => !MODELS[k].custom && (!MODELS[k].req || hasTech(MODELS[k].req)));
     const fill = free ? models.map((k) => `<button class="btn" type="button" data-act="fillhall" data-a="${k}" ${S.money < priceOf(k) ? 'disabled' : ''}><span>${MODELS[k].name} ${typeTag(MODELS[k].type)}<small>до ${free} шт. · по ${fmt$(priceOf(k))}</small></span><span class="price">${fmt$(priceOf(k) * free)}</span></button>`).join('') : '<p class="muted">Свободных слотов нет. Поставьте стойки.</p>';
     const ups = [];
     models.forEach((from) => models.forEach((to) => {
@@ -1838,7 +2193,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     return `<h3>${HALLS[hi].name}: массовые действия</h3>
       <p class="muted">Строить можно «кистью»: выберите инструмент и протяните мышью или пальцем по клеткам. Нажмите на клетку, чтобы открыть её.</p>
       ${broken ? `<button class="btn primary" type="button" data-act="repairhall" ${S.money < repCost ? 'disabled' : ''}>Починить все сломанные (${broken}) · ${fmt$(repCost)}</button>` : ''}
-      ${nSrv ? `<button class="btn" type="button" data-act="maintain" ${S.money < mntCost ? 'disabled' : ''}><span>Профилактика всего зала<small>Средний износ ${Math.round(avgAge / 24)} дн. · поломки ×${(1 + avgAge / 480).toFixed(1).replace('.', ',')} → ×1,0</small></span><span class="price">${fmt$(mntCost)}</span></button>` : ''}
+      <div class="shop">${netPanel()}
+      ${nSrv ? `<button class="btn" type="button" data-act="maintain" ${S.money < mntCost ? 'disabled' : ''}><span>Профилактика всего зала<small>Средний износ ${Math.round(avgAge / 24)} дн. · поломки ×${(1 + avgAge / 480).toFixed(1).replace('.', ',')} → ×1,0</small></span><span class="price">${fmt$(mntCost)}</span></button>` : ''}</div>
       <h3>Заполнить все стойки зала</h3><div class="shop">${fill}</div>
       ${ups.length ? `<h3>Модернизация</h3><div class="shop">${ups.join('')}</div>` : ''}
       <dl class="kv"><dt>Перегрев</dt><dd class="warn">от 32 °C, мощность −15%</dd><dt>Критично</dt><dd class="crit">от 40 °C, поломки ×10</dd><dt>Пожар</dt><dd class="crit">от 44 °C</dd></dl>`;
@@ -1861,17 +2217,19 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         const working = t.s.length - t.broken;
         const repairCost = t.s.slice(working).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
         const fire = t.fire ? `<button class="btn hot" type="button" data-act="extinguish">ТУШИТЬ ПОЖАР</button>` : '';
-        const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${MODELS[m].cap} ${TYPES[MODELS[m].type].unit}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать · ${fmt$(n >= working ? priceOf(m) * 0.1 : sellOf(m))}</button></div>`).join('');
-        const shop = t.s.length < RACK_SLOTS ? `<h3>Добавить сервер (${t.s.length}/${RACK_SLOTS})</h3><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].req || hasTech(MODELS[k].req)).map((k) => {
+        const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${capsText(MODELS[m])}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать · ${fmt$(n >= working ? priceOf(m) * 0.1 : sellOf(m))}</button></div>`).join('');
+        const stockBtns = Object.keys(S.stock).filter((k) => S.stock[k] > 0 && MODELS[k]).map((k) => `<button class="btn" type="button" data-act="fromstock" data-a="${k}"><span>${MODELS[k].name}<small>${capsText(MODELS[k])} · со склада, есть ${S.stock[k]}</small></span><span class="price">поставить</span></button>`).join('');
+        const shop = t.s.length < RACK_SLOTS ? `<h3>Добавить сервер (${t.s.length}/${RACK_SLOTS})</h3>${stockBtns ? `<div class="shop">${stockBtns}</div>` : ''}<p class="muted">Готовые решения от вендора — ставятся сразу, но дороже сборки.</p><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].custom && (!MODELS[k].req || hasTech(MODELS[k].req))).map((k) => {
           const m = MODELS[k], free = RACK_SLOTS - t.s.length, pr = priceOf(k);
           return `<div class="row"><button class="btn" type="button" data-act="addsrv" data-a="${k}" ${S.money < pr ? 'disabled' : ''} style="flex:1"><span>${m.name} ${typeTag(m.type)}<small>${m.cap} ${TYPES[m.type].unit} · тепло ${m.heat} · ${m.kw} кВт</small></span><span class="price">${fmt$(pr)}</span></button>${free > 1 ? `<button class="btn sm" type="button" data-act="fillrack" data-a="${k}" ${S.money < pr ? 'disabled' : ''}>×${free}</button>` : ''}</div>`;
         }).join('')}</div>` : '<p class="muted">Стойка заполнена.</p>';
-        return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}
+        return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}${rackNetHtml(t, h, i)}
           <dl class="kv"><dt>Износ</dt><dd class="${(t.age || 0) > 480 ? 'warn' : ''}">${wearText(t)}</dd><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
           ${t.broken ? `<button class="btn primary" type="button" data-act="repair" ${S.money < repairCost ? 'disabled' : ''}>Починить сейчас · ${fmt$(repairCost)}</button>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
           <div class="slots">${slots || '<p class="muted">Пустая стойка.</p>'}</div>${shop}
           <button class="btn danger" type="button" data-act="demolish">Демонтировать стойку · +${fmt$(refund(t))}</button>`;
       }
+      if (isSwitch(t)) return switchHtml(t, h, i, where);
       const b = BUILD[t.k];
       return `<h3>${where}</h3><p class="ttl">${b.name}</p><p class="muted">${b.desc}</p>${b.kw ? `<dl class="kv"><dt>Потребление</dt><dd>${b.kw} кВт</dd></dl>` : ''}<button class="btn danger" type="button" data-act="demolish">Демонтировать · +${fmt$(refund(t))}</button>`;
     },
@@ -1926,7 +2284,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
           <p class="muted ${ok ? 'ok' : 'warn'}">${ok ? '✓' : '✗'} ${c.need}</p>
           ${st ? '' : `<div class="row"><span></span><button class="btn sm primary" type="button" data-act="cert" data-a="${c.id}" ${ok && S.money >= c.price ? '' : 'disabled'}>Получить</button></div>`}</div>`;
       }).join('')}</div>`;
-      return certs + `<h3>Исследования</h3>${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="meter"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
+      return `<h3>Цели</h3>${TAB.goals()}` + certs + `<h3>Исследования</h3>${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="meter"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
         <div class="list">${TECH.map((t) => {
           const done = hasTech(t.id);
           const reqOk = !t.req || t.req.every(hasTech);
@@ -1971,6 +2329,48 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         <h3>Чистая прибыль по дням</h3>${chart}
         <dl class="kv"><dt>Серверов</dt><dd>${countServers()}</dd><dt>Лучший день</dt><dd>${fmt$(S.stats.bestDay)}</dd><dt>Контрактов выполнено / провалено</dt><dd>${S.stats.done} / ${S.stats.failed}</dd><dt>Оценка компании</dt><dd>${fmt$(value)}</dd></dl>
         ${S.debtDays ? `<p class="crit">Счёт в минусе ${S.debtDays} дн. На 3-й день — банкротство.</p>` : ''}${loanHtml}`;
+    },
+    asm() {
+      const d = S.draft;
+      const spec = designSpec(d);
+      const seg = (key, group) => `<div class="seg">${Object.entries(PARTS[group]).map(([k, pt]) => `<button type="button" data-act="draft" data-a="${key}:${k}" aria-pressed="${d[key] === k}" ${pt.req && !hasTech(pt.req) ? 'disabled title="Нужно исследование"' : ''}>${pt.name}</button>`).join('')}</div>`;
+      const step = (key, max) => `<span class="stepper"><button class="btn sm" type="button" data-act="draftN" data-a="${key}:-1">−</button>${d[key]}${max !== undefined ? ` / ${max}` : ''}<button class="btn sm" type="button" data-act="draftN" data-a="${key}:1">+</button></span>`;
+      const ch = PARTS.ch[d.ch];
+      const ready = { cpu: 'b1', sto: 's1', gpu: 'g1' }[spec.type];
+      const per = spec.cap ? spec.price / spec.cap : 0, perReady = priceOf(ready) / MODELS[ready].cap;
+      const busy = manualBusy();
+      const total = spec.price * d.qty;
+      const queue = S.asm.map((j) => `<div class="row meta"><span>${j.n} × ${MODELS[j.mid].name}</span><span>${j.by === 'manual' ? `вы сами, ${j.left} ч на штуку` : j.by === 'tech' ? 'сборщики' : `подрядчик, ${j.left} ч`}</span></div>`).join('');
+      const stock = Object.keys(S.stock).filter((k) => S.stock[k] > 0 && MODELS[k]).map((k) => `<div class="row meta"><span>${MODELS[k].name} · ${capsText(MODELS[k])}</span><span>${S.stock[k]} шт.</span></div>`).join('');
+      return `<p class="muted">Соберите сервер из комплектующих: дешевле готовых решений и можно совмещать вычисления, диски и GPU в одной машине. Цены деталей идут за рынком железа.</p>
+        <div class="part"><b>Корпус</b>${seg('ch', 'ch')}</div>
+        <div class="part"><div class="row"><b>Процессоры</b>${step('ncpu', ch.sockets)}</div>${seg('cpu', 'cpu')}</div>
+        <div class="part"><b>Память</b>${seg('ram', 'ram')}</div>
+        <div class="part"><div class="row"><b>Диски</b>${step('ndisk', ch.bays)}</div>${seg('disk', 'disk')}</div>
+        <div class="part"><div class="row"><b>Ускорители</b>${step('ngpu', ch.gpus)}</div>${seg('gpu', 'gpu')}</div>
+        <dl class="kv"><dt>Мощность</dt><dd>${Object.keys(spec.caps).length ? capsText(spec) : '—'}</dd><dt>Тепло / питание</dt><dd>${spec.heat} · ${spec.kw} кВт</dd><dt>Цена деталей</dt><dd>${fmt$(spec.price)}</dd><dt>За единицу ${TYPES[spec.type].unit}</dt><dd class="${per && per < perReady ? 'ok' : 'warn'}">${fmt$(per)} (готовое: ${fmt$(perReady)})</dd></dl>
+        ${spec.errs.length ? `<p class="crit">${spec.errs.join('; ')}</p>` : ''}
+        <div class="row"><b>Количество</b>${step('qty')}</div>
+        <div class="shop">
+          <button class="btn" type="button" data-act="assemble" data-a="manual" ${busy || spec.errs.length || S.money < total ? 'disabled' : ''}><span>Собрать самому<small>${busy ? 'вы заняты другой ручной работой' : `по 2 ч на сервер, без наценки`}</small></span><span class="price">${fmt$(total)}</span></button>
+          <button class="btn" type="button" data-act="assemble" data-a="tech" ${!S.staff.tech || spec.errs.length || S.money < total ? 'disabled' : ''}><span>Отдать сборщикам<small>${S.staff.tech ? `${S.staff.tech} чел., по серверу в час каждый` : 'наймите сборщиков в «Персонале»'}</small></span><span class="price">${fmt$(total)}</span></button>
+          <button class="btn" type="button" data-act="assemble" data-a="contract" ${spec.errs.length || S.money < total * 1.2 ? 'disabled' : ''}><span>Подрядчик<small>вся партия за 2 ч, наценка 20%</small></span><span class="price">${fmt$(total * 1.2)}</span></button>
+        </div>
+        <h3>Очередь сборки</h3>${queue || '<p class="muted">Пусто.</p>'}
+        <h3>Склад</h3>${stock || '<p class="muted">Пусто. Собранные серверы ставятся в стойки кнопкой «со склада» или массово из панели зала.</p>'}`;
+    },
+    contr() {
+      const jobs = S.netJobs.filter((j) => j.by === 'contract').length + S.asm.filter((j) => j.by === 'contract').length;
+      const kits = KITS.map((k) => {
+        const locked = (k.req && !hasTech(k.req)) || (BUILD[k.cool].req && !hasTech(BUILD[k.cool].req)) || (BUILD[k.sw].req && !hasTech(BUILD[k.sw].req));
+        const pr = kitPrice(k);
+        return `<button class="btn" type="button" data-act="kit" data-a="${k.id}" ${locked || S.money < pr || !S.halls[S.cur].open ? 'disabled' : ''}><span>${k.name}<small>${locked ? 'нужны исследования' : k.desc}</small></span><span class="price">${fmt$(pr)}</span></button>`;
+      }).join('');
+      return `<p class="muted">Подрядчики делают быстро, но дорого. Сейчас у них заказов: ${jobs}.</p>
+        <h3>Готовые решения под ключ</h3><p class="muted">Монтаж в текущем зале «${HALLS[S.cur].name}»: стойки с серверами, охлаждение и коммутатор — подключено и настроено. Наценка 25% + $1 500 за работу.</p>
+        <div class="shop">${kits}</div>
+        <h3>Сеть в зале</h3><div class="shop">${netPanel() || '<p class="muted">Все стойки подключены, коммутаторы настроены.</p>'}</div>
+        <h3>Прайс</h3><dl class="kv"><dt>Кабель к стойке</dt><dd>$150 + $40 за клетку, 1 ч</dd><dt>Настройка коммутатора</dt><dd>$500, 1 ч</dd><dt>Сборка партии серверов</dt><dd>+20% к деталям, 2 ч</dd></dl>`;
     },
     infra() {
       const pts = Array.from({ length: 24 }, (_, h) => spotPrice(h) * (hasTech('solar') ? 0.65 : 1));
@@ -2118,6 +2518,24 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         });
       }
 
+      // cables
+      H.grid.forEach((t, i) => {
+        if (!t || t.k !== 'rack') return;
+        const x = O + (i % D.w) * T + T / 2, y = O + Math.floor(i / D.w) * T + T / 2;
+        if (t.link === null) {
+          if (Math.floor(now / 500) % 2) { ctx.fillStyle = COL.bad; ctx.font = `800 ${Math.max(10, T * 0.3)}px JetBrains Mono, monospace`; ctx.fillText('!', x + T * 0.32, y - T * 0.3); }
+          return;
+        }
+        if (t.link === undefined) return;
+        const sx = O + (t.link % D.w) * T + T / 2, sy = O + Math.floor(t.link / D.w) * T + T / 2;
+        ctx.save();
+        if (t.cable === 'laying') { ctx.setLineDash([4, 4]); ctx.lineDashOffset = -now / 40; ctx.strokeStyle = 'rgba(242,178,74,.9)'; }
+        else ctx.strokeStyle = 'rgba(108,180,255,.35)';
+        ctx.lineWidth = Math.max(1.5, T * 0.035);
+        ctx.beginPath(); ctx.moveTo(x, y + T * 0.42); ctx.lineTo(x, sy + T * 0.42); ctx.lineTo(sx, sy + T * 0.42); ctx.stroke();
+        ctx.restore();
+      });
+
       // staff
       const door = { x: O * 0.2, y: doorY };
       const jobsHere = S.jobs.filter((j) => j.h === hi);
@@ -2257,6 +2675,19 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       ctx.lineTo(x + T * 0.42, y + T * 0.82); ctx.lineTo(x + T * 0.68, y + T * 0.44); ctx.lineTo(x + T * 0.5, y + T * 0.44); ctx.closePath(); ctx.fill();
       return;
     }
+    if (SW[t.k]) {
+      ctx.fillStyle = '#1b2733'; ctx.fillRect(x + p, y + T * 0.3, T - 2 * p, T * 0.4);
+      const col = t.cfg === 'ok' ? null : t.cfg === 'bad' ? COL.bad : t.cfg === 'work' ? COL.accent : COL.warn;
+      ctx.strokeStyle = col && Math.floor(now / 400) % 2 ? col : '#3a4958'; ctx.lineWidth = col ? 2 : 1;
+      ctx.strokeRect(x + p + 0.5, y + T * 0.3 + 0.5, T - 2 * p - 1, T * 0.4 - 1);
+      const n = SW[t.k].ports > 8 ? 16 : 8, used = portsUsed(S.halls[S.cur].grid, i);
+      for (let k = 0; k < n; k++) {
+        const on = k < Math.ceil((used / SW[t.k].ports) * n);
+        ctx.fillStyle = dark ? '#111' : on ? (Math.sin(now / 80 + k) > -0.4 ? COL.led : '#16402b') : '#0b1015';
+        ctx.fillRect(x + p + 3 + (k % 8) * ((T - 2 * p - 6) / 8), y + T * (k < 8 ? 0.4 : 0.55), Math.max(2, (T - 2 * p - 6) / 8 - 2), Math.max(2, T * 0.07));
+      }
+      return;
+    }
     if (t.k === 'gas') {
       ctx.fillStyle = '#4a545e'; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
       const fl = 0.8 + 0.2 * Math.sin(now / 120);
@@ -2349,7 +2780,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     if (e.target.closest && e.target.closest('input,textarea')) return;
     if (e.code === 'Space' && S.started && e.target === document.body) { e.preventDefault(); S.paused = !S.paused; renderUI(); }
     if (e.key === 'Escape') { S.tool = 'select'; S.sel = null; renderUI(); }
-    const keys = { 1: 'rack', 2: 'crac', 3: 'chiller', 4: 'ups', 5: 'gen', 6: 'trafo' };
+    const keys = { 1: 'rack', 2: 'crac', 3: 'chiller', 4: 'ups', 5: 'gen', 6: 'trafo', 7: 'sw' };
     if (keys[e.key] && S.started) { const k = keys[e.key]; if (!BUILD[k].req || hasTech(BUILD[k].req)) { S.tool = k; renderUI(); } }
   });
   window.addEventListener('resize', () => layoutCanvas());
@@ -2366,11 +2797,32 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
           <li>Подписывайте контракты с клиентами: сайты, банки, игры, видео, нейросети.</li>
           <li>Ставьте стойки и серверы, следите за теплом и мощностью зала.</li>
           <li>Нанимайте админов и безопасников, исследуйте технологии, арендуйте новые залы.</li>
+          <li>Стойки работают только через настроенный коммутатор: прокладывайте кабели и настраивайте сеть сами, инженерами или подрядчиками.</li>
+          <li>Собирайте серверы из комплектующих или берите готовые решения.</li>
           <li>Следите за рынком, участвуйте в тендерах и поглощайте конкурентов.</li>
           <li>Рутину отдайте людям: завхоз докупает железо, аккаунт-менеджер подписывает контракты.</li>
           <li>Пожары, DDoS, отключения света и экскаваторы прилагаются. При авариях игра сама встаёт на паузу.</li>
         </ul>
         ${saved && saved.v === 1 && !saved.over ? `<button class="btn primary" type="button" data-act="load">Продолжить · день ${saved.day}, ${fmt$(saved.money)}</button><button class="btn" type="button" data-act="newgame">Новая игра</button>` : `<button class="btn primary" type="button" data-act="newgame">Начать</button>`}`;
+    } else if (mode === 'netcfg') {
+      const tg = S.cfgTarget;
+      const H = S.halls[tg.h];
+      const models = [...new Set(H.grid.filter((t) => t && t.k === 'rack').flatMap((t) => t.s))].map((m) => MODELS[m].name);
+      const sws = H.grid.filter(isSwitch).length;
+      const sel = (k, label) => `<label for="cfg-${k}">${label}</label><select id="cfg-${k}">${CFG_OPTS[k].map((v) => `<option>${v}</option>`).join('')}</select>`;
+      card.innerHTML = `<h2>Настройка коммутатора</h2>
+        <p>${HALLS[tg.h].name} · ${tileName(tg.h, tg.i)}. Сверьтесь с регламентом и паспортом зала. Ошибка даст потери пакетов: −40% мощности подключённых стоек.</p>
+        <ol class="rules">
+          <li>VLAN = 10 × номер зала (Каморка — №1, Подвал — №2 и т. д.).</li>
+          <li>MTU 9000, если в зале есть хранилища или серверы с дисками, иначе 1500.</li>
+          <li>Аплинк всегда в режиме trunk.</li>
+          <li>STP включать, если в зале больше одного коммутатора.</li>
+          <li>Скорость портов по самому мощному железу: поколение 1 — 10G, 2 (Silver, flash, GPU-узел, Ядро-32) — 25G, 3 (Platinum, GPU-кластер, Ядро-96, Ускоритель H) — 100G.</li>
+        </ol>
+        <p class="facts">Паспорт: зал №${tg.h + 1} · коммутаторов: ${sws} · серверы: ${models.join(', ') || 'нет'}</p>
+        <div class="cfg">${sel('vlan', 'VLAN')}${sel('mtu', 'MTU')}${sel('uplink', 'Аплинк')}${sel('stp', 'STP')}${sel('speed', 'Скорость портов')}</div>
+        <button class="btn primary" type="button" data-act="cfgApply">Применить конфигурацию</button>
+        <button class="btn" type="button" data-act="cfgCancel">Отмена</button>`;
     } else if (mode === 'menu') {
       card.innerHTML = `<h2>Пауза</h2><p>Игра сохраняется сама каждый игровой день.</p>
         <button class="btn primary" type="button" data-act="resume">Продолжить</button>
@@ -2394,7 +2846,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   ACT.load = () => {
     try {
       const data = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0 }, data.staff); S.energy = data.energy || { tariff: 'spot', next: 'spot', dayF: 1 }; S.sec = data.sec || { pentest: 0 }; S.bw = data.bw || { dem: 0, cap: 10 }; S.stats = Object.assign({ tenders: 0 }, data.stats); S.policy = Object.assign({ headroom: 0.25, reserve: 5000, racks: true }, data.policy); S.inbox = data.energy ? data.inbox || [] : []; S.hw = data.hw || { cpu: 1, sto: 1, gpu: 1 }; S.certs = data.certs || {}; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
+      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0, neteng: 0, tech: 0 }, data.staff); ['designs', 'asm', 'netJobs'].forEach((k) => { S[k] = data[k] || []; }); S.stock = data.stock || {}; S.draft = data.draft || base.draft; S.designs.forEach(registerDesign); S.energy = data.energy || { tariff: 'spot', next: 'spot', dayF: 1 }; S.sec = data.sec || { pentest: 0 }; S.bw = data.bw || { dem: 0, cap: 10 }; S.stats = Object.assign({ tenders: 0 }, data.stats); S.policy = Object.assign({ headroom: 0.25, reserve: 5000, racks: true }, data.policy); S.inbox = data.energy ? data.inbox || [] : []; S.hw = data.hw || { cpu: 1, sto: 1, gpu: 1 }; S.certs = data.certs || {}; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
     } catch (e) { /* fall through */ }
     ACT.newgame();
   };
