@@ -137,6 +137,9 @@ button { font: inherit; color: inherit; }
 }
 canvas { display: block; touch-action: manipulation; cursor: pointer; max-width: 100%; }
 .tag.urgent { background: rgba(255, 95, 95, .2); color: #ff9c9c; }
+.tag.good { background: rgba(79, 209, 139, .2); color: #8fe6b5; }
+.tag.vip { background: rgba(242, 178, 74, .22); color: #f6cd85; }
+.curve { width: 100%; height: 70px; display: block; }
 .mkt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .mkt div { padding: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; display: grid; gap: 2px; }
 .mkt b { font: 600 16px var(--f-mono); }
@@ -230,7 +233,6 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 }
 @media (max-width: 520px) {
   .res { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; }
-  .res .date { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -249,6 +251,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       <div class="chip"><span class="k">Вычисления, ядер</span><span class="v" id="rCpu">0 / 0</span></div>
       <div class="chip"><span class="k">Хранение, ТБ</span><span class="v" id="rSto">0 / 0</span></div>
       <div class="chip"><span class="k">ИИ, GPU</span><span class="v" id="rGpu">0 / 0</span></div>
+      <div class="chip"><span class="k">Канал, Гбит/с</span><span class="v" id="rNet">0 / 10</span></div>
     </div>
     <div class="ctl">
       <div class="seg" role="group" aria-label="Скорость">
@@ -323,6 +326,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     ups: { name: 'ИБП', price: 1000, kw: 0, backup: 25, short: '25 кВт', desc: 'Держит 25 кВт нагрузки зала при отключении электричества.' },
     gen: { name: 'Дизель', price: 6000, kw: 0, backup: 150, req: 'diesel', short: '150 кВт', desc: 'Генератор держит 150 кВт при отключении.' },
     trafo: { name: 'Трансформатор', price: 2500, kw: 0, power: 60, short: '+60 кВт', desc: 'Поднимает лимит мощности зала на 60 кВт.' },
+    gas: { name: 'Газовая турбина', price: 12000, kw: 0, backup: 80, gas: 80, req: 'gas', short: '80 кВт', desc: 'Вырабатывает до 80 кВт по $0,30/кВт·ч, когда сеть дороже. При отключении держит 80 кВт.' },
+    heatx: { name: 'Теплообменник', price: 6000, kw: 1, cool: 20, r: 2, heatx: true, req: 'heatreuse', short: 'продаёт тепло', desc: 'Снимает 20 ед. тепла в радиусе 2 и продаёт его городской котельной. На севере тепло стоит вдвое дороже.' },
     miner: { name: 'ASIC-ферма соседей', price: 0, kw: 6, hidden: true, desc: 'Чужая майнинг-ферма. Платит $30 в час, но выдаёт 40 ед. тепла и забирает охлаждение у соседних стоек.' },
   };
   const MINER_HEAT = 40;
@@ -337,6 +342,15 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     { name: 'Дешёвые диски', desc: 'Хранилища вдвое дешевле в закупке.', mult: { sto: 0.9 }, hw: { sto: 0.5 }, days: 6 },
   ];
   const BIDS = [0.75, 0.9, 1, 1.15];
+  const NET_TIERS = [
+    { name: '10 Гбит/с', cap: 10, price: 0, fee: 0 },
+    { name: '40 Гбит/с', cap: 40, price: 3000, fee: 60 },
+    { name: '100 Гбит/с', cap: 100, price: 12000, fee: 200 },
+    { name: '400 Гбит/с', cap: 400, price: 50000, fee: 700 },
+    { name: '1 Тбит/с', cap: 1000, price: 200000, fee: 2500 },
+  ];
+  const BW = { web: 0.15, game: 0.25, bank: 0.05, backup: 0.06, media: 0.12, ai: 0.02, render: 0.03 };
+  const GAS_FUEL = 0.3, FIXED_PRICE = 0.5;
   const CERTS = [
     { id: 'tier3', name: 'Tier III', price: 20000, desc: 'Резервирование питания. Контракты с SLA 99.9% платят на 20% больше.',
       need: 'Во всех залах резерв ИБП/дизелей не меньше нагрузки',
@@ -382,6 +396,12 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     { id: 'solar', name: 'Солнечная станция', price: 100000, days: 4, desc: 'Электричество дешевле на 35%.' },
     { id: 'peering', name: 'Пиринг на точке обмена', price: 150000, days: 3, req: ['fiber'], desc: 'Новые контракты платят на 15% больше.' },
     { id: 'gpu2', name: 'GPU-кластеры', price: 250000, days: 5, req: ['liquid'], desc: 'GPU-серверы на 32 ускорителя.' },
+    { id: 'cdn', name: 'Своя CDN', price: 25000, days: 2, req: ['fiber'], desc: 'Трафик сайтов, игр и видео −40%.' },
+    { id: 'gas', name: 'Газовые турбины', price: 20000, days: 2, req: ['diesel'], desc: 'Своя генерация: дешевле сети в часы пик.' },
+    { id: 'heatreuse', name: 'Утилизация тепла', price: 35000, days: 2.5, req: ['chiller'], desc: 'Теплообменники продают тепло серверов городу.' },
+    { id: 'ngfw', name: 'Межсетевой экран NGFW', price: 15000, days: 1.5, desc: 'Защита от атак +20.' },
+    { id: 'offbackup', name: 'Резервные копии вне площадки', price: 20000, days: 2, desc: 'Шифровальщик блокирует зал на 12 ч вместо 48, штрафы за утечки −50%.' },
+    { id: 'zerotrust', name: 'Zero Trust', price: 120000, days: 4, req: ['ngfw'], desc: 'Защита от атак +30.' },
     { id: 'aiops', name: 'AIOps', price: 500000, days: 6, req: ['k8s', 'gpu'], desc: 'Поломки −60%, админы чинят вдвое быстрее.' },
   ];
   const STAFF = {
@@ -389,6 +409,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     eng: { name: 'Инженер-климатовик', pay: 300, desc: '+8% к охлаждению во всех залах за каждого.', max: 10 },
     guard: { name: 'Безопасник', pay: 250, desc: 'Тушит пожары за час и гасит DDoS на 15% за каждого.', max: 6 },
     sales: { name: 'Менеджер продаж', pay: 350, desc: '+1 предложение и +5% к оплате новых контрактов.', max: 5 },
+    soc: { name: 'SOC-аналитик', pay: 400, desc: 'Круглосуточный мониторинг атак: +15 к защите за каждого.', max: 4 },
     buyer: { name: 'Завхоз', pay: 500, desc: 'Сам докупает серверы (и стойки рядом с кондиционерами), чтобы мощности хватало на все контракты с запасом. Правила задаются ниже.', max: 1 },
     acct: { name: 'Аккаунт-менеджер', pay: 450, desc: 'Сам подписывает контракты, на которые хватает свободной мощности (с запасом 10%). Самые выгодные — первыми.', max: 1 },
   };
@@ -419,7 +440,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   const EVENTS = {
     outage: { name: 'Отключение электричества', desc: 'Залы, где резерв ИБП и дизелей меньше нагрузки, обесточены.', h: [2, 5], cls: '' },
     heat: { name: 'Аномальная жара', desc: '+8 °C к воздуху во всех залах, кроме северного.', h: [24, 48], cls: 'mild' },
-    ddos: { name: 'DDoS-атака', desc: 'Нагрузка на CPU ×1,6. Помогают безопасники и Анти-DDoS.', h: [4, 10], cls: '' },
+    ddos: { name: 'DDoS-атака', desc: 'Мусорный трафик забивает интернет-каналы. Помогают безопасники, Анти-DDoS и широкие каналы.', h: [4, 10], cls: '' },
     fiber: { name: 'Экскаватор перерубил оптику', desc: 'Клиенты получают только 40% сервиса.', h: [2, 4], cls: '', skip: 'fiber' },
     crypto: { name: 'Криптобум', desc: 'Новые GPU-контракты платят вдвое.', h: [48, 72], cls: 'good' },
   };
@@ -448,6 +469,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     { t: 'Поглотите конкурента', ok: () => S.rivals.some((r) => r.bought), r: 100000 },
     { t: 'Поднимите репутацию до ★★★★★', ok: () => repLevel() >= 5, r: 150000 },
     { t: 'Откройте Северный ЦОД', ok: () => S.halls[4].open, r: 300000 },
+    { t: 'Выйдите на биржу (IPO)', ok: () => !!S.ipo, r: 500000 },
     { t: 'Постройте Гиперскейл-кампус', ok: () => S.halls[5].open, r: 1000000, win: true },
     { t: 'Держите 500 серверов', ok: () => countServers() >= 500, r: 2000000 },
   ];
@@ -461,7 +483,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     g[1 * 5 + 2] = { k: 'crac' };
     const st = {
       v: 1, day: 1, hour: 8, money: 3000, rep: 10, speed: 1, paused: false, started: false, over: false, won: false,
-      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0 }, jobs: [],
+      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0 }, jobs: [],
       contracts: [], offers: [], nextId: 1, event: null, nextEvent: 44, goal: 0,
       stats: { signed: 0, done: 0, failed: 0, bestDay: 0, tenders: 0 },
       today: { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 }, history: [], hourly: [],
@@ -473,6 +495,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       rivals: [{ name: 'ГигаХост', rep: 28, bought: false }, { name: 'Облако-24', rep: 42, bought: false }, { name: 'ООО «Сервер на балконе»', rep: 12, bought: false }],
       policy: { headroom: 0.25, reserve: 5000, racks: true },
       hw: { cpu: 1, sto: 1, gpu: 1 }, certs: {}, insured: false,
+      energy: { tariff: 'spot', next: 'spot', dayF: 1 }, bw: { dem: 0, cap: 10 }, sec: { pentest: 0 }, ipo: null, overReason: '', heatInc: 0,
       autoPause: true,
     };
     S = st;
@@ -600,8 +623,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       const st = hallStats(hi);
       H.load = st.load; H.cap = st.cap; H.backup = st.backup;
       const wasDark = H.dark;
-      H.dark = !!outage && st.backup < st.load;
-      if (H.dark && !wasDark) log(`${HALLS[hi].name}: резерва не хватило, зал обесточен`, 'crit');
+      if (H.locked > 0 && --H.locked === 0) log(`${HALLS[hi].name}: системы восстановлены после атаки`, 'good');
+      H.dark = (!!outage && st.backup < st.load) || H.locked > 0;
+      if (H.dark && !wasDark && !H.locked) log(`${HALLS[hi].name}: резерва не хватило, зал обесточен`, 'crit');
     });
 
     // capacity
@@ -615,13 +639,22 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     // demand
     const dem = { cpu: 0, sto: 0, gpu: 0 }, peak = { cpu: 0, sto: 0, gpu: 0 };
     S.contracts.forEach((c) => { dem[c.type] += c.amount * PROF[KINDS[c.kind].prof](S.hour); peak[c.type] += c.amount; });
+    // network
+    let bwDem = 0, bwCap = 0;
+    S.contracts.forEach((c) => {
+      const cdn = hasTech('cdn') && (c.kind === 'web' || c.kind === 'media' || c.kind === 'game') ? 0.6 : 1;
+      bwDem += c.amount * BW[c.kind] * PROF[KINDS[c.kind].prof](S.hour) * cdn;
+    });
+    S.halls.forEach((H) => { if (H.open && !H.dark) bwCap += NET_TIERS[H.net || 0].cap; });
     if (ev && ev.type === 'ddos') {
       const shield = hasTech('antiddos') ? 0.15 : 1 - Math.min(0.6, S.staff.guard * 0.15);
-      dem.cpu *= 1 + 0.6 * shield;
+      bwDem += Math.min(400, bwCap * 0.9) * shield;
     }
+    const netF = bwDem > 0 ? Math.min(1, bwCap / bwDem) : 1;
+    S.bw = { dem: bwDem, cap: bwCap };
     const served = {}, util = {};
     for (const k in dem) {
-      served[k] = dem[k] > 0 ? Math.min(1, cap[k] / dem[k]) : 1;
+      served[k] = dem[k] > 0 ? Math.min(1, cap[k] / dem[k]) * netF : 1;
       if (ev && ev.type === 'fiber') served[k] *= 0.4;
       util[k] = cap[k] > 0 ? Math.min(1, dem[k] / cap[k]) : 0;
     }
@@ -723,22 +756,50 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         S.stats.done++;
         log(`Контракт «${c.name}» выполнен (${up.toFixed(2)}%). Бонус ${fmt$(bonus)}`, 'good');
         Sound.coin();
+        if (!c.urgent && !c.tender && Math.random() < 0.65) {
+          const o = renewOffer(c);
+          S.offers.unshift(o);
+          log(`«${c.name}» хочет продлить контракт${o.vip ? ' (VIP-клиент)' : ''}: ${fmt$(o.pay)}/ч`, 'good');
+        }
       } else {
         const fine = Math.round(c.pay * 12 * (S.insured ? 0.5 : 1));
         S.money -= fine; S.today.other += fine;
         S.rep = Math.max(0, S.rep - 4 - c.lvl * 2);
         S.stats.failed++;
-        log(`SLA нарушен: «${c.name}» (${up.toFixed(2)}% < ${c.sla}%). Штраф ${fmt$(fine)}`, 'crit');
+        if (c.loyal) S.rep = Math.max(0, S.rep - 2 * c.loyal);
+        log(`SLA нарушен: «${c.name}» (${up.toFixed(2)}% < ${c.sla}%). Штраф ${fmt$(fine)}${c.loyal ? '. Постоянный клиент ушёл и рассказал всем' : ''}`, 'crit');
         Sound.bad();
       }
     });
     income *= 1 - S.equity;
     income += S.subs;
     S.halls.forEach((H) => { if (H.open && !H.dark) H.grid.forEach((t) => { if (t && t.k === 'miner' && !t.fire) income += 30; }); });
-    // expenses: electricity
-    let kw = 0;
-    S.halls.forEach((H) => { if (H.open && !H.dark) kw += H.load; });
-    const elec = kw * 0.4 * (hasTech('solar') ? 0.65 : 1);
+    // heat reuse
+    let heatInc = 0;
+    S.halls.forEach((H, hi) => {
+      if (!H.open || H.dark) return;
+      const D = HALLS[hi];
+      H.grid.forEach((t, i) => {
+        if (!t || t.k !== 'heatx') return;
+        const x = i % D.w, y = Math.floor(i / D.w);
+        H.grid.forEach((r, j) => {
+          if (r && (r.k === 'rack' || r.k === 'miner') && Math.max(Math.abs((j % D.w) - x), Math.abs(Math.floor(j / D.w) - y)) <= 2) heatInc += (r.heat || 0) * 0.05 * (D.amb < 15 ? 2 : 1);
+        });
+      });
+    });
+    S.heatInc = heatInc;
+    income += heatInc;
+    // expenses: electricity (spot/fixed tariff, own gas generation)
+    const price = elecPrice();
+    let elec = 0;
+    S.halls.forEach((H, hi) => {
+      if (!H.open || H.dark) return;
+      const gasCap = H.grid.reduce((a, t) => a + (t && BUILD[t.k] && BUILD[t.k].gas ? BUILD[t.k].gas : 0), 0);
+      const useGas = outage || price > GAS_FUEL ? Math.min(H.load, gasCap) : 0;
+      const grid = outage ? 0 : H.load - useGas;
+      H.gasUsed = useGas;
+      elec += grid * price + useGas * GAS_FUEL;
+    });
     S.money += income - elec;
     S.today.inc += income; S.today.elec += elec;
     S.hourly.push(income - elec);
@@ -756,6 +817,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const flow = 0.25 * TARIFFS[S.tariff].flow * (S.promo > 0 ? 2.5 : 1);
     if (S.offers.length < want && Math.random() < flow) S.offers.push(genOffer());
     if (S.promo > 0) S.promo--;
+    if (S.sec.pentest > 0) S.sec.pentest--;
     if (S.staff.acct > 0) autoSign();
     if (S.staff.buyer > 0 && S.hour % 3 === 0) autoBuy();
     marketTick();
@@ -853,6 +915,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const sal = Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0);
     const rent = HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0);
     const interest = Math.round(S.loan * 0.012);
+    const netFee = S.halls.reduce((a, H) => a + (H.open ? NET_TIERS[H.net || 0].fee : 0), 0);
+    if (netFee) { S.money -= netFee; S.today.other += netFee; }
+    S.energy.tariff = S.energy.next;
+    S.energy.dayF = rand(0.8, 1.3);
     const premium = S.insured ? insurancePremium() : 0;
     if (premium) { S.money -= premium; S.today.other += premium; }
     CERTS.forEach((c) => {
@@ -875,6 +941,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     if (S.mhist.length > 30) S.mhist.shift();
     S.today = { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 };
     log(`День ${S.day}. Вчера: ${net >= 0 ? 'прибыль' : 'убыток'} ${fmt$(net)}`, net >= 0 ? '' : 'warn');
+    securityDay();
+    if (S.over) return;
+    ipoDay(net);
+    if (S.over) return;
     if (S.money < 0) {
       S.debtDays++;
       if (S.debtDays >= 3) { gameOver(); return; }
@@ -896,8 +966,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     }
   }
 
-  function gameOver() {
+  function gameOver(reason = 'bankrupt') {
     S.over = true;
+    S.overReason = reason;
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     Sound.crash();
     showOverlay('over');
@@ -946,8 +1017,23 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     return null;
   }
   const URGENT_KIND = { cpu: 'web', sto: 'backup', gpu: 'ai' };
+  const RANSOM = 0;
 
   const MSGS = [
+    {
+      from: 'Вымогатели «ByteBandits»',
+      special: true,
+      def: 'no',
+      cond: () => false,
+      text: (d) => `Ваш зал «${HALLS[d.hi].name}» зашифрован. Переведите ${fmt$(d.sum)} в биткоинах — и ключ ваш. Иначе ждите восстановления.`,
+      yes: ['Заплатить выкуп', (d) => {
+        if (!spend(d.sum)) return;
+        if (Math.random() < 0.8) { S.halls[d.hi].locked = 1; log('Ключ получен, зал расшифровывается', 'warn'); }
+        else log('Вымогатели взяли деньги и пропали. Зал всё ещё заблокирован', 'crit');
+        S.rep = Math.max(0, S.rep - 2);
+      }],
+      no: ['Восстанавливаться самим', () => log('Восстанавливаемся из бэкапов без выкупа')],
+    },
     {
       from: 'Маркетинг',
       text: () => 'Запустим рекламу у блогеров за $1 500? Двое суток клиентов будет в разы больше.',
@@ -1103,6 +1189,88 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     S.offers.filter((o) => o.lvl <= L).sort((a, b) => b.pay / b.amount - a.pay / a.amount).forEach((o) => {
       if (spare[o.type] >= o.amount * 1.1) { spare[o.type] -= o.amount; signOffer(o, true); }
     });
+  }
+
+  // ----- energy -----
+  function spotPrice(h) {
+    const curve = h < 6 ? 0.6 : h < 9 ? 0.9 : h < 18 ? 1.15 : h < 22 ? 1.5 : 0.9;
+    const heat = S.event && S.event.type === 'heat' ? 1.6 : 1;
+    return 0.4 * curve * S.energy.dayF * heat;
+  }
+  function elecPrice(h = S.hour) {
+    return (S.energy.tariff === 'fixed' ? FIXED_PRICE : spotPrice(h)) * (hasTech('solar') ? 0.65 : 1);
+  }
+
+  // ----- security -----
+  const revenue24 = () => S.hourly.reduce((a, b) => a + Math.max(0, b), 0);
+  const threat = () => clamp(5 + revenue24() / 400 + S.rep / 4, 0, 100);
+  const defense = () => clamp(10 * S.staff.guard + 15 * S.staff.soc + (hasTech('antiddos') ? 10 : 0) + (hasTech('ngfw') ? 20 : 0) + (hasTech('zerotrust') ? 30 : 0) + (S.sec.pentest > 0 ? 20 : 0), 0, 100);
+  const attackChance = () => clamp(0.04 + (threat() - defense()) / 120, 0.02, 0.5);
+  function securityDay() {
+    if (S.day < 5 || Math.random() >= attackChance()) return;
+    const th = threat();
+    const types = ['insider', 'leak'];
+    if (th >= 30) types.push('ransom', 'ransom');
+    const type = pick(types);
+    if (type === 'insider') {
+      const sum = Math.round(Math.min(Math.max(0, S.money) * 0.05, 20000));
+      if (!sum) return;
+      S.money -= sum; S.today.other += sum;
+      log(`Инсайдер вывел со счёта ${fmt$(sum)}. Усильте защиту`, 'crit');
+    } else if (type === 'leak') {
+      const fine = Math.round(Math.max(300, revenue24() * 1.5) * (hasTech('offbackup') ? 0.5 : 1) * (S.insured ? 0.5 : 1));
+      S.money -= fine; S.today.other += fine;
+      S.rep = Math.max(0, S.rep - 6);
+      log(`Утечка данных клиентов! Штраф регулятора ${fmt$(fine)}, репутация −6`, 'crit');
+    } else {
+      const halls = S.halls.map((H, i) => i).filter((i) => S.halls[i].open && !S.halls[i].locked && S.halls[i].grid.some((t) => t && t.k === 'rack' && t.s.length));
+      if (!halls.length) return;
+      const hi = pick(halls);
+      S.halls[hi].locked = hasTech('offbackup') ? 12 : 48;
+      const sum = Math.round(Math.max(5000, revenue24() * 2) / 100) * 100;
+      S.inbox.unshift({ id: S.nextId++, i: RANSOM, left: 8, data: { hi, sum } });
+      log(`Шифровальщик заблокировал «${HALLS[hi].name}» на ${S.halls[hi].locked} ч. Вымогатели ждут ответа в почте`, 'crit');
+      toast('Атака шифровальщика! Смотрите почту', 'bad');
+    }
+    Sound.alarm();
+    alertPause('кибератака');
+  }
+
+  // ----- IPO -----
+  function ipoDay(net) {
+    const I = S.ipo;
+    if (!I) return;
+    I.qProfit += net;
+    I.price = Math.max(1, I.price * (1 + rand(-0.02, 0.025) + (net > 0 ? 0.004 : -0.006)));
+    I.hist.push(Math.round(I.price * 10) / 10);
+    if (I.hist.length > 90) I.hist.shift();
+    if (S.day - I.qStart < 30) return;
+    if (I.qProfit >= I.target) {
+      const g = clamp(I.qProfit / I.target - 1, 0, 1);
+      I.price *= 1.05 + g * 0.5;
+      I.misses = 0;
+      S.rep = Math.min(100, S.rep + 3);
+      log(`Квартал закрыт: прибыль ${fmt$(I.qProfit)} при плане ${fmt$(I.target)}. Акции растут`, 'good');
+      Sound.win();
+    } else {
+      I.price *= 0.75;
+      I.misses++;
+      log(`Квартал провален: ${fmt$(I.qProfit)} при плане ${fmt$(I.target)}. Акции −25%. Промахов подряд: ${I.misses}`, 'crit');
+      Sound.bad();
+      if (I.misses >= 2) { gameOver('board'); return; }
+      toast('Ещё один провальный квартал — и совет директоров вас уволит', 'bad');
+    }
+    I.target = Math.round(Math.max(I.qProfit, I.target) * 1.1);
+    I.qStart = S.day; I.qProfit = 0;
+  }
+
+  // ----- renewals -----
+  function renewOffer(c) {
+    const loyal = (c.loyal || 0) + 1;
+    const vip = loyal >= 3;
+    const amount = Math.round(c.amount * rand(1, 1.3));
+    const pay = Math.round((c.pay / c.amount) * amount * (vip ? 1.3 : 1.12) * 10) / 10;
+    return { id: S.nextId++, name: c.name, kind: c.kind, type: c.type, amount, sla: c.sla, lvl: Math.min(c.lvl, repLevel()), pay, days: c.days, expires: 48, renew: true, loyal, vip };
   }
 
   // ----- market -----
@@ -1412,6 +1580,31 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       log(`Получен сертификат ${c.name}`, 'good');
       Sound.win();
     },
+    tariffE(a) { S.energy.next = a; log(`С завтрашнего дня тариф на электричество: ${a === 'fixed' ? 'фиксированный' : 'биржевой'}`); },
+    netup(a) {
+      const H = S.halls[Number(a)];
+      const nx = (H.net || 0) + 1;
+      if (!NET_TIERS[nx] || !spend(NET_TIERS[nx].price)) return;
+      H.net = nx;
+      log(`Канал в «${HALLS[Number(a)].name}» расширен до ${NET_TIERS[nx].name}`, 'good');
+      Sound.build();
+    },
+    pentest() {
+      const cost = 2000 * repLevel();
+      if (S.sec.pentest > 0 || !spend(cost)) return;
+      S.sec.pentest = 168;
+      log(`Пентест проведён: защита +20 на неделю`, 'good');
+    },
+    ipo() {
+      if (S.ipo || valuation() < 2e6 || S.rep < 70) return;
+      const cash = Math.round(valuation() * 0.25);
+      S.money += cash; S.today.other -= cash;
+      S.equity = Math.min(0.7, S.equity + 0.25);
+      const last = S.history.reduce((a, d) => a + d.net, 0);
+      S.ipo = { price: 100, hist: [100], qStart: S.day, qProfit: 0, target: Math.round(Math.max(20000, last * 1.1)), misses: 0 };
+      log(`IPO! Компания на бирже, привлечено ${fmt$(cash)}. План на квартал: ${fmt$(S.ipo.target)}`, 'good');
+      Sound.win();
+    },
     insure() { S.insured = !S.insured; log(S.insured ? 'Оборудование застраховано' : 'Страховка отменена'); },
     promoBuy() {
       const cost = 1000 * repLevel();
@@ -1536,6 +1729,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       el.textContent = `${fmtN(S.dem[k])} / ${fmtN(S.cap[k])}`;
       el.className = `v ${S.dem[k] > 0 && S.served[k] < 0.98 ? 'neg' : ''}`;
     }
+    const rn = $('#rNet');
+    rn.textContent = `${fmtN(S.bw.dem)} / ${fmtN(S.bw.cap)}`;
+    rn.className = `v ${S.bw.dem > S.bw.cap ? 'neg' : ''}`;
     $('#bPause').setAttribute('aria-pressed', String(S.paused));
     $('#bPause').textContent = S.paused ? '▶' : 'II';
     document.querySelectorAll('[data-act="speed"]').forEach((b) => b.setAttribute('aria-pressed', String(!S.paused && Number(b.dataset.a) === S.speed)));
@@ -1571,7 +1767,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const H = S.halls[S.cur], D = HALLS[S.cur];
     if (H.open) {
       refreshHall(S.cur);
-      setHTML('#hallinfo', `<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>`);
+      setHTML('#hallinfo', `${H.locked ? `<span class="over"><b class="over">ЗАШИФРОВАН · ${H.locked} ч</b></span>` : ''}<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Канал <b>${NET_TIERS[H.net || 0].name}</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>`);
     } else setHTML('#hallinfo', `<span>Зал ${D.w}×${D.h} клеток · ${D.kw} кВт · воздух ${D.amb} °C · аренда ${fmt$(D.rent)}/день</span>`);
     const lock = $('#lockcard');
     if (!H.open) {
@@ -1588,7 +1784,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 
     // tabs
     const tabs = [['obj', 'Объект'], ['deals', `Контракты<sup>${S.offers.length}</sup>`], ['tender', `Тендеры${S.tender && !S.tender.bid ? '<sup>!</sup>' : ''}`], ['mail', `Почта${S.inbox.length ? `<sup>${S.inbox.length}</sup>` : ''}`],
-      ['staff', 'Персонал'], ['tech', 'Развитие'], ['fin', 'Финансы'], ['goals', 'Цели']];
+      ['infra', 'Инфра'], ['staff', 'Персонал'], ['tech', 'Развитие'], ['fin', 'Финансы'], ['goals', 'Цели']];
     setHTML('#tabs', tabs.map(([k, n]) => `<button type="button" data-act="tab" data-a="${k}" aria-pressed="${S.tab === k}">${n}</button>`).join(''));
     if (!pressing) setHTML('#tab', TAB[S.tab]());
 
@@ -1684,14 +1880,14 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       const active = S.contracts.map((c) => {
         const up = c.hrs ? (c.ok / c.hrs) * 100 : 100;
         const ok = up >= c.sla;
-        return `<div class="item"><div class="row"><b>${c.name}</b><span>${c.urgent ? '<span class="tag urgent">Срочно</span> ' : ''}${typeTag(c.type)}</span></div>
+        return `<div class="item"><div class="row"><b>${c.name}</b><span>${c.urgent ? '<span class="tag urgent">Срочно</span> ' : ''}${c.vip ? '<span class="tag vip">VIP</span> ' : c.loyal ? `<span class="tag good">×${c.loyal + 1}</span> ` : ''}${typeTag(c.type)}</span></div>
           <div class="row meta"><span>${KINDS[c.kind].label} · ${fmtN(c.amount)} ${TYPES[c.type].unit}</span><span>${fmt$(c.pay)}/ч</span></div>
           <div class="row meta"><span class="${ok ? 'ok' : 'crit'}">аптайм ${up.toFixed(2)}% / SLA ${c.sla}%</span><span>ещё ${Math.ceil(c.left / 24)} дн.</span></div>
           <div class="row"><span></span><button class="btn sm danger" type="button" data-act="cancel" data-a="${c.id}">Расторгнуть · −${fmt$(c.pay * 24)}</button></div></div>`;
       }).join('');
       const offers = S.offers.map((o) => {
         const can = L >= o.lvl;
-        return `<div class="item"><div class="row"><b>${o.name}</b><span>${o.urgent ? '<span class="tag urgent">Срочно</span> ' : ''}${typeTag(o.type)}</span></div>
+        return `<div class="item"><div class="row"><b>${o.name}</b><span>${o.urgent ? '<span class="tag urgent">Срочно</span> ' : ''}${o.vip ? '<span class="tag vip">VIP</span> ' : o.renew ? '<span class="tag good">Продление</span> ' : ''}${typeTag(o.type)}</span></div>
           <div class="row meta"><span>${KINDS[o.kind].label} · пик ${fmtN(o.amount)} ${TYPES[o.type].unit}</span><span>${fmt$(o.pay)}/ч</span></div>
           <div class="row meta"><span>SLA ${o.sla}% · ${o.days} дн. · ${'★'.repeat(o.lvl)}</span><span>${fmt$(o.pay * 24)}/день</span></div>
           <div class="row"><span class="meta">исчезнет через ${o.expires} ч</span><span><button class="btn sm" type="button" data-act="reject" data-a="${o.id}">Отказать</button> <button class="btn sm primary" type="button" data-act="sign" data-a="${o.id}" ${can ? '' : 'disabled'}>${can ? 'Подписать' : 'Мала репутация'}</button></span></div></div>`;
@@ -1756,13 +1952,52 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       const lim = loanLimit();
       const insHtml = `<h3>Страховка</h3><p class="muted">Покрывает 80% стоимости сгоревших серверов и половину штрафов за SLA. Взнос — 0,4% стоимости оборудования в день.</p>
         <div class="row"><span class="meta">${S.insured ? 'действует' : 'нет'} · ${fmt$(insurancePremium())}/день</span><button class="btn sm ${S.insured ? '' : 'primary'}" type="button" data-act="insure">${S.insured ? 'Отменить' : 'Застраховать'}</button></div>`;
-      const loanHtml = insHtml + `<h3>Кредит</h3><dl class="kv"><dt>Долг</dt><dd class="${S.loan ? 'warn' : ''}">${fmt$(S.loan)}</dd><dt>Проценты</dt><dd>1,2% в день · ${fmt$(S.loan * 0.012)}</dd><dt>Банк готов дать ещё</dt><dd>${fmt$(lim)}</dd><dt>Доля инвесторов</dt><dd>${Math.round(S.equity * 100)}%</dd></dl>
+      const I = S.ipo;
+      let ipoHtml;
+      if (I) {
+        const mn = Math.min(...I.hist), mxp = Math.max(...I.hist);
+        const pts = I.hist.map((v, n) => `${(n / Math.max(1, I.hist.length - 1)) * 240},${60 - ((v - mn) / Math.max(1, mxp - mn)) * 56 - 2}`).join(' ');
+        ipoHtml = `<h3>Биржа</h3><dl class="kv"><dt>Цена акции</dt><dd>${I.price.toFixed(1).replace('.', ',')}</dd><dt>План на квартал</dt><dd>${fmt$(I.target)}</dd><dt>Прибыль за квартал</dt><dd class="${I.qProfit >= I.target ? 'ok' : 'warn'}">${fmt$(I.qProfit)}</dd><dt>До конца квартала</dt><dd>${30 - (S.day - I.qStart)} дн.</dd><dt>Провалов подряд</dt><dd class="${I.misses ? 'crit' : ''}">${I.misses} из 2</dd></dl>
+          <svg class="curve" viewBox="0 0 240 60" preserveAspectRatio="none" role="img" aria-label="Цена акции"><polyline points="${pts}" fill="none" stroke="#6cb4ff" stroke-width="1.5"/></svg>`;
+      } else {
+        const can = valuation() >= 2e6 && S.rep >= 70;
+        ipoHtml = `<h3>IPO</h3><p class="muted">Выход на биржу: сразу 25% оценки компании деньгами, но 25% дохода уходит акционерам, и каждые 30 дней нужно расти на 10%. Два провала подряд — вас уволят.</p>
+          <div class="row"><span class="muted ${can ? 'ok' : ''}">Нужно: оценка от $2 млн и репутация от 70</span><button class="btn sm primary" type="button" data-act="ipo" ${can ? '' : 'disabled'}>Выйти на биржу</button></div>`;
+      }
+      const loanHtml = ipoHtml + insHtml + `<h3>Кредит</h3><dl class="kv"><dt>Долг</dt><dd class="${S.loan ? 'warn' : ''}">${fmt$(S.loan)}</dd><dt>Проценты</dt><dd>1,2% в день · ${fmt$(S.loan * 0.012)}</dd><dt>Банк готов дать ещё</dt><dd>${fmt$(lim)}</dd><dt>Доля инвесторов</dt><dd>${Math.round(S.equity * 100)}%</dd></dl>
         <div class="row"><span>${[5000, 25000, 100000, 500000].filter((v) => v <= lim).map((v) => `<button class="btn sm" type="button" data-act="loan" data-a="${v}">Взять ${fmt$(v)}</button>`).join(' ') || '<span class="muted">Лимит исчерпан</span>'}</span></div>
         ${S.loan ? `<div class="row"><span></span><span><button class="btn sm" type="button" data-act="repay" data-a="5000" ${S.money >= Math.min(5000, S.loan) ? '' : 'disabled'}>Погасить ${fmt$(Math.min(5000, S.loan))}</button> <button class="btn sm primary" type="button" data-act="repay" data-a="all" ${S.money >= S.loan ? '' : 'disabled'}>Погасить всё</button></span></div>` : ''}`;
       return `<h3>Сегодня</h3><dl class="kv"><dt>Доход от клиентов</dt><dd class="ok">${fmt$(d.inc)}</dd><dt>Электричество</dt><dd>${fmt$(-d.elec)}</dd><dt>Покупки, штрафы, награды</dt><dd>${fmt$(-d.other)}</dd><dt>Зарплаты (в полночь)</dt><dd>${fmt$(-Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0))}</dd><dt>Аренда (в полночь)</dt><dd>${fmt$(-HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0))}</dd></dl>
         <h3>Чистая прибыль по дням</h3>${chart}
         <dl class="kv"><dt>Серверов</dt><dd>${countServers()}</dd><dt>Лучший день</dt><dd>${fmt$(S.stats.bestDay)}</dd><dt>Контрактов выполнено / провалено</dt><dd>${S.stats.done} / ${S.stats.failed}</dd><dt>Оценка компании</dt><dd>${fmt$(value)}</dd></dl>
         ${S.debtDays ? `<p class="crit">Счёт в минусе ${S.debtDays} дн. На 3-й день — банкротство.</p>` : ''}${loanHtml}`;
+    },
+    infra() {
+      const pts = Array.from({ length: 24 }, (_, h) => spotPrice(h) * (hasTech('solar') ? 0.65 : 1));
+      const mx = Math.max(...pts, FIXED_PRICE, GAS_FUEL) * 1.1;
+      const W = 240, Hh = 70, bw = W / 24;
+      const y = (v) => Hh - (v / mx) * Hh;
+      const curve = `<svg class="curve" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Цена электричества по часам">${pts.map((v, h) => `<rect x="${h * bw + 0.5}" y="${y(v)}" width="${bw - 1}" height="${Hh - y(v)}" fill="${h === S.hour ? '#6cb4ff' : '#2b3a48'}"/>`).join('')}<line x1="0" x2="${W}" y1="${y(GAS_FUEL)}" y2="${y(GAS_FUEL)}" stroke="#f2b24a" stroke-dasharray="3 3"/><line x1="0" x2="${W}" y1="${y(FIXED_PRICE)}" y2="${y(FIXED_PRICE)}" stroke="#a184e6" stroke-dasharray="3 3"/></svg>`;
+      const gasNow = S.halls.reduce((a, H) => a + (H.open ? H.gasUsed || 0 : 0), 0);
+      const energy = `<h3>Энергия</h3>
+        <dl class="kv"><dt>Цена сейчас</dt><dd>$${elecPrice().toFixed(2).replace('.', ',')}/кВт·ч</dd><dt>Своя генерация сейчас</dt><dd>${gasNow.toFixed(0)} кВт</dd><dt>Продажа тепла</dt><dd class="ok">${fmt$(S.heatInc)}/ч</dd></dl>
+        ${curve}<p class="muted">Столбики — биржевая цена по часам сегодня. Жёлтая линия — себестоимость газовой турбины, фиолетовая — фиксированный тариф.</p>
+        <div class="row"><span class="muted">Тариф с завтра</span><div class="seg"><button type="button" data-act="tariffE" data-a="spot" aria-pressed="${S.energy.next === 'spot'}">Биржа</button><button type="button" data-act="tariffE" data-a="fixed" aria-pressed="${S.energy.next === 'fixed'}">Фикс $0,50</button></div></div>`;
+      const nets = S.halls.map((H, i) => {
+        if (!H.open) return '';
+        const cur = NET_TIERS[H.net || 0], nx = NET_TIERS[(H.net || 0) + 1];
+        return `<div class="row"><span>${HALLS[i].name}: <b>${cur.name}</b>${cur.fee ? ` <span class="meta">· ${fmt$(cur.fee)}/день</span>` : ''}</span>${nx ? `<button class="btn sm" type="button" data-act="netup" data-a="${i}" ${S.money < nx.price ? 'disabled' : ''}>До ${nx.name} · ${fmt$(nx.price)}</button>` : '<span class="meta ok">максимум</span>'}</div>`;
+      }).join('');
+      const bwPct = S.bw.cap ? Math.min(100, (S.bw.dem / S.bw.cap) * 100) : 100;
+      const network = `<h3>Сеть</h3><div class="cap"><span>Трафик</span><div class="meter"><i style="width:${bwPct}%;background:${S.bw.dem > S.bw.cap ? 'var(--crit)' : bwPct > 85 ? 'var(--warn)' : 'var(--ok)'}"></i></div><span>${fmtN(S.bw.dem)} / ${fmtN(S.bw.cap)}</span></div>
+        <p class="muted">Каналы всех залов складываются. Не хватит канала — все клиенты получат меньше сервиса. Больше всего трафика едят видео и игры.</p>${nets}`;
+      const th = threat(), df = defense();
+      const security = `<h3>Безопасность</h3>
+        <div class="cap"><span>Угроза</span><div class="meter"><i style="width:${th}%;background:var(--crit)"></i></div><span>${Math.round(th)}</span></div>
+        <div class="cap"><span>Защита</span><div class="meter"><i style="width:${df}%;background:var(--ok)"></i></div><span>${Math.round(df)}</span></div>
+        <p class="muted">Угроза растёт с выручкой и известностью. Шанс атаки сегодня: ${Math.round(attackChance() * 100)}%. Защиту дают безопасники, SOC-аналитики, NGFW, Zero Trust и пентесты.</p>
+        <div class="row"><span class="muted">${S.sec.pentest > 0 ? `Пентест действует ещё ${Math.ceil(S.sec.pentest / 24)} дн.` : 'Пентест: +20 к защите на неделю'}</span><button class="btn sm" type="button" data-act="pentest" ${S.sec.pentest > 0 || S.money < 2000 * repLevel() ? 'disabled' : ''}>Заказать · ${fmt$(2000 * repLevel())}</button></div>`;
+      return energy + network + security;
     },
     tender() {
       const T = S.tender;
@@ -1927,7 +2162,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       if (H.dark) {
         ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(O, O, D.w * T, D.h * T);
         ctx.fillStyle = COL.bad; ctx.font = `800 ${Math.max(12, T * 0.4)}px Unbounded, sans-serif`;
-        if (Math.floor(now / 500) % 2) ctx.fillText('НЕТ ПИТАНИЯ', O + (D.w * T) / 2, O + (D.h * T) / 2);
+        if (Math.floor(now / 500) % 2) ctx.fillText(H.locked ? 'ЗАШИФРОВАН' : 'НЕТ ПИТАНИЯ', O + (D.w * T) / 2, O + (D.h * T) / 2);
       }
     }
   }
@@ -2020,6 +2255,23 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       ctx.beginPath();
       ctx.moveTo(x + T * 0.55, y + T * 0.2); ctx.lineTo(x + T * 0.32, y + T * 0.55); ctx.lineTo(x + T * 0.5, y + T * 0.55);
       ctx.lineTo(x + T * 0.42, y + T * 0.82); ctx.lineTo(x + T * 0.68, y + T * 0.44); ctx.lineTo(x + T * 0.5, y + T * 0.44); ctx.closePath(); ctx.fill();
+      return;
+    }
+    if (t.k === 'gas') {
+      ctx.fillStyle = '#4a545e'; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      const fl = 0.8 + 0.2 * Math.sin(now / 120);
+      ctx.fillStyle = dark ? '#555' : '#4fb3ff';
+      ctx.beginPath(); ctx.moveTo(x + T * 0.5, y + T * (0.78 - 0.45 * fl)); ctx.quadraticCurveTo(x + T * 0.75, y + T * 0.6, x + T * 0.5, y + T * 0.78); ctx.quadraticCurveTo(x + T * 0.25, y + T * 0.6, x + T * 0.5, y + T * (0.78 - 0.45 * fl)); ctx.fill();
+      return;
+    }
+    if (t.k === 'heatx') {
+      ctx.fillStyle = '#3d2c26'; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      ctx.strokeStyle = '#ff9a5a'; ctx.lineWidth = Math.max(1.5, T * 0.04);
+      for (let k = 0; k < 3; k++) {
+        ctx.beginPath();
+        for (let s2 = 0; s2 <= 8; s2++) { const px = x + T * (0.22 + s2 * 0.07), py = y + T * (0.32 + k * 0.18) + Math.sin(s2 + now / 300) * T * 0.04; if (s2) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+        ctx.stroke();
+      }
       return;
     }
     ctx.fillStyle = COL.dim; ctx.fillText(b.name[0], x + T / 2, y + T / 2);
@@ -2134,7 +2386,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       card.innerHTML = `<h2>Вы — гиперскейлер</h2><p>За ${S.day} дней вы прошли путь от каморки под лестницей до кампуса на 3 мегаватта. Серверов: ${countServers()}.</p>
         <button class="btn primary" type="button" data-act="keep">Играть дальше</button>`;
     } else {
-      card.innerHTML = `<h2>Банкротство</h2><p>Три дня в минусе — кредиторы забрали серверы. Вы продержались ${S.day} дней и выполнили ${S.stats.done} контрактов.</p>
+      card.innerHTML = S.overReason === 'board' ? `<h2>Вас уволили</h2><p>Два квартала подряд без роста — совет директоров нашёл нового CEO. Вы продержались ${S.day} дн. и выполнили ${S.stats.done} контрактов.</p>` : `<h2>Банкротство</h2><p>Три дня в минусе — кредиторы забрали серверы. Вы продержались ${S.day} дн. и выполнили ${S.stats.done} контрактов.</p>
         <button class="btn primary" type="button" data-act="newgame">Новая игра</button>`;
     }
     $('#overlay').hidden = false;
@@ -2142,7 +2394,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   ACT.load = () => {
     try {
       const data = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0 }, data.staff); S.stats = Object.assign({ tenders: 0 }, data.stats); S.policy = Object.assign({ headroom: 0.25, reserve: 5000, racks: true }, data.policy); S.inbox = data.inbox || []; S.hw = data.hw || { cpu: 1, sto: 1, gpu: 1 }; S.certs = data.certs || {}; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
+      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0, soc: 0 }, data.staff); S.energy = data.energy || { tariff: 'spot', next: 'spot', dayF: 1 }; S.sec = data.sec || { pentest: 0 }; S.bw = data.bw || { dem: 0, cap: 10 }; S.stats = Object.assign({ tenders: 0 }, data.stats); S.policy = Object.assign({ headroom: 0.25, reserve: 5000, racks: true }, data.policy); S.inbox = data.energy ? data.inbox || [] : []; S.hw = data.hw || { cpu: 1, sto: 1, gpu: 1 }; S.certs = data.certs || {}; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
     } catch (e) { /* fall through */ }
     ACT.newgame();
   };
