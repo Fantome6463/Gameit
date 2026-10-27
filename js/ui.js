@@ -59,7 +59,7 @@ function renderUI() {
   const H = S.halls[S.cur], D = HALLS[S.cur];
   if (H.open) {
     refreshHall(S.cur);
-    setHTML('#hallinfo', `${H.locked ? `<span class="over"><b class="over">ЗАШИФРОВАН · ${H.locked} ч</b></span>` : ''}<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Канал <b>${NET_TIERS[H.net || 0].name}</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>`);
+    setHTML('#hallinfo', `${H.locked ? `<span class="over"><b class="over">ЗАШИФРОВАН · ${H.locked} ч</b></span>` : ''}<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Канал <b>${NET_TIERS[H.net || 0].name}</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>${H.debt >= 1 ? `<span>Техдолг <b class="${H.debt > DEBT_SAFE ? 'over' : ''}">${Math.round(H.debt)}</b></span>` : ''}`);
   } else setHTML('#hallinfo', `<span>Зал ${D.w}×${D.h} клеток · ${D.kw} кВт · воздух ${D.amb} °C · аренда ${fmt$(D.rent)}/день</span>`);
   const lock = $('#lockcard');
   if (!H.open) {
@@ -84,12 +84,34 @@ function renderUI() {
 }
 
 const typeTag = (t) => `<span class="tag ${t}">${TYPES[t].name}</span>`;
+// Пик по договорам против мощности: зелёный — влезает, жёлтый — овербукинг в пределах политики, красный — сверх неё.
 const capRow = (k) => {
   const c = S.cap[k], d = S.peak[k];
   const pct = c ? Math.min(100, (d / c) * 100) : d ? 100 : 0;
-  const col = d > c ? 'var(--crit)' : pct > 85 ? 'var(--warn)' : 'var(--ok)';
-  return `<div class="cap"><span>${TYPES[k].name}</span><div class="meter"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}</span></div>`;
+  const col = d > c * oversell() + 0.01 ? 'var(--crit)' : d > c ? 'var(--warn)' : 'var(--ok)';
+  return `<div class="cap"><span>${TYPES[k].name}</span><div class="meter"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}${d > c && c ? ` · ${Math.round((d / c) * 100)}%` : ''}</span></div>`;
 };
+// Суточный график: залито — пик по договорам сейчас, линия — с предложением, пунктир — мощность.
+function loadChart(type, extra) {
+  const W = 240, H = 40, now = contractCurve(type), next = extra ? contractCurve(type, extra) : now, cap = S.cap[type];
+  const top = Math.max(1, cap, ...next) * 1.1;
+  const y = (v) => (H - (v / top) * H).toFixed(1);
+  const pts = (a) => a.map((v, h) => `${((h / 23) * W).toFixed(1)},${y(v)}`).join(' ');
+  return `<svg class="load" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <polygon points="0,${H} ${pts(now)} ${W},${H}" fill="var(--${type})" fill-opacity=".35"/>
+    ${extra ? `<polyline points="${pts(next)}" fill="none" stroke="var(--fg)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ''}
+    <line x1="0" x2="${W}" y1="${y(cap)}" y2="${y(cap)}" stroke="var(--crit)" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+// Как предложение ложится на суточный профиль: прибавка к пику против заявленного объёма.
+function fitHtml(o) {
+  const before = S.peak[o.type] || 0, after = planPeak(o.type, o), cap = S.cap[o.type];
+  const add = after - before, share = o.amount ? add / o.amount : 1;
+  const tag = share < 0.6 ? '<span class="tag good">Дополняет профиль</span>' : share > 0.95 && before > 0 ? '<span class="tag vip">Бьёт в ваш пик</span>' : '';
+  const pct = cap ? Math.round((after / cap) * 100) : 0;
+  const cls = !cap || after > cap * oversell() ? 'crit' : after > cap ? 'warn' : 'ok';
+  return `${loadChart(o.type, o)}<div class="row meta"><span>${tag || 'Пик вырастет'} +${fmtN(add)} из ${fmtN(o.amount)}</span><span class="${cls}">пик ${fmtN(after)} / ${fmtN(cap)}${cap ? ` · ${pct}%` : ''}</span></div>`;
+}
 
 function marketHtml() {
   const spark = (k) => {
@@ -174,13 +196,21 @@ function hallPanel() {
     const cost = priceOf(to) - sellOf(from);
     ups.push(`<button class="btn" type="button" data-act="upghall" data-a="${from}>${to}" ${S.money < cost ? 'disabled' : ''}><span>${n} × ${MODELS[from].name} → ${MODELS[to].name}<small>по ${fmt$(cost)} с учётом сдачи старых</small></span><span class="price">${fmt$(cost * n)}</span></button>`);
   }));
-  const repCost = racks.reduce((a, t) => a + t.s.slice(t.s.length - t.broken).reduce((b, m) => b + 80 * MODELS[m].tier, 0), 0);
+  const repCost = racks.reduce((a, t) => a + repairCost(t), 0);
+  const repQuick = racks.reduce((a, t) => a + quickCost(t), 0);
+  const repDebt = racks.reduce((a, t) => a + quickDebt(t), 0);
+  const debt = debtOf(hi);
   const nSrv = racks.reduce((a, t) => a + t.s.length, 0);
   const avgAge = racks.length ? racks.reduce((a, t) => a + (t.age || 0), 0) / racks.length : 0;
   const mntCost = nSrv * 40;
   return `<h3>${HALLS[hi].name}: массовые действия</h3>
     <p class="muted">Строить можно «кистью»: выберите инструмент и протяните мышью или пальцем по клеткам. Нажмите на клетку, чтобы открыть её.</p>
-    ${broken ? `<button class="btn primary" type="button" data-act="repairhall" ${S.money < repCost ? 'disabled' : ''}>Починить все сломанные (${broken}) · ${fmt$(repCost)}</button>` : ''}
+    ${broken ? `<div class="shop"><button class="btn primary" type="button" data-act="repairhall" ${S.money < repCost ? 'disabled' : ''}><span>Починить все сломанные (${broken})<small>по-честному</small></span><span class="price">${fmt$(repCost)}</span></button>
+      <button class="btn" type="button" data-act="repairhall" data-a="quick" ${S.money < repQuick ? 'disabled' : ''}><span>Всё на изоленте<small>техдолг +${repDebt}</small></span><span class="price">${fmt$(repQuick)}</span></button></div>` : ''}
+    <h3>Технический долг: ${Math.round(debt)} / 100</h3>
+    <div class="meter"><i style="width:${debt}%;background:${debt > 60 ? 'var(--crit)' : debt > DEBT_SAFE ? 'var(--warn)' : 'var(--ok)'}"></i></div>
+    <p class="muted">Копится от ремонта на изоленте. Поломки ×${debtFailMult(hi).toFixed(2).replace('.', ',')}${debt > DEBT_SAFE ? `, риск каскадной аварии ~${(100 * (1 - Math.pow(1 - cascadeChance(hi), 24))).toFixed(0)}% в сутки` : `, каскадов нет до ${DEBT_SAFE}`}. Свободные админы понемногу разгребают костыли.</p>
+    ${debt >= 1 ? `<div class="shop"><button class="btn" type="button" data-act="refactor" ${S.money < refactorCost(hi) ? 'disabled' : ''}><span>Рефакторинг<small>убрать все костыли в зале</small></span><span class="price">${fmt$(refactorCost(hi))}</span></button></div>` : ''}
     <div class="shop">${netPanel()}
     ${nSrv ? `<button class="btn" type="button" data-act="maintain" ${S.money < mntCost ? 'disabled' : ''}><span>Профилактика всего зала<small>Средний износ ${Math.round(avgAge / 24)} дн. · поломки ×${(1 + avgAge / 480).toFixed(1).replace('.', ',')} → ×1,0</small></span><span class="price">${fmt$(mntCost)}</span></button>` : ''}</div>
     <h3>Заполнить все стойки зала</h3><div class="shop">${fill}</div>
@@ -204,7 +234,6 @@ const TAB = {
     if (t.k === 'rack') {
       const tc = t.temp > 40 ? 'crit' : t.temp > 32 ? 'warn' : 'ok';
       const working = t.s.length - t.broken;
-      const repairCost = t.s.slice(working).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
       const fire = t.fire ? `<button class="btn hot" type="button" data-act="extinguish">ТУШИТЬ ПОЖАР</button>` : '';
       const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${capsText(MODELS[m])}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать · ${fmt$(n >= working ? priceOf(m) * 0.1 : sellOf(m))}</button></div>`).join('');
       const stockBtns = Object.keys(S.stock).filter((k) => S.stock[k] > 0 && MODELS[k]).map((k) => `<button class="btn" type="button" data-act="fromstock" data-a="${k}"><span>${MODELS[k].name}<small>${capsText(MODELS[k])} · со склада, есть ${S.stock[k]}</small></span><span class="price">поставить</span></button>`).join('');
@@ -214,7 +243,8 @@ const TAB = {
       }).join('')}</div>` : '<p class="muted">Стойка заполнена.</p>';
       return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}${rackNetHtml(t, h, i)}
         <dl class="kv"><dt>Износ</dt><dd class="${(t.age || 0) > 480 ? 'warn' : ''}">${wearText(t)}</dd><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
-        ${t.broken ? `<button class="btn primary" type="button" data-act="repair" ${S.money < repairCost ? 'disabled' : ''}>Починить сейчас · ${fmt$(repairCost)}</button>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
+        ${t.broken ? `<div class="shop"><button class="btn primary" type="button" data-act="repair" ${S.money < repairCost(t) ? 'disabled' : ''}><span>Починить по-честному<small>без последствий</small></span><span class="price">${fmt$(repairCost(t))}</span></button>
+          <button class="btn" type="button" data-act="repair" data-a="quick" ${S.money < quickCost(t) ? 'disabled' : ''}><span>На изоленте<small>техдолг зала +${quickDebt(t)}: поломки чаще, растёт риск каскадной аварии</small></span><span class="price">${fmt$(quickCost(t))}</span></button></div>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
         <div class="slots">${slots || '<p class="muted">Серверов нет.</p>'}</div>${shop}${switchHtml(t, h, i)}
         <button class="btn danger" type="button" data-act="demolish">Демонтировать стойку · +${fmt$(refund(t))}</button>`;
     }
@@ -236,6 +266,7 @@ const TAB = {
       return `<div class="item"><div class="row"><b>${o.name}</b><span>${o.urgent ? '<span class="tag urgent">Срочно</span> ' : ''}${o.vip ? '<span class="tag vip">VIP</span> ' : o.renew ? '<span class="tag good">Продление</span> ' : ''}${typeTag(o.type)}</span></div>
         <div class="row meta"><span>${KINDS[o.kind].label} · пик ${fmtN(o.amount)} ${TYPES[o.type].unit}</span><span>${fmt$(o.pay)}/ч</span></div>
         <div class="row meta"><span>SLA ${o.sla}% · ${o.days} дн. · ${'★'.repeat(o.lvl)}</span><span>${fmt$(o.pay * 24)}/день</span></div>
+        ${fitHtml(o)}
         <div class="row"><span class="meta">исчезнет через ${o.expires} ч</span><span><button class="btn sm" type="button" data-act="reject" data-a="${o.id}">Отказать</button> <button class="btn sm primary" type="button" data-act="sign" data-a="${o.id}" ${can ? '' : 'disabled'}>${can ? 'Подписать' : 'Мала репутация'}</button></span></div></div>`;
     }).join('');
     const acct = S.staff.acct ? '<p class="muted ok">Аккаунт-менеджер сам подписывает контракты, если хватает мощности.</p>' : '<p class="muted">Нет времени выбирать? Наймите аккаунт-менеджера во вкладке «Персонал» — он будет подписывать сам.</p>';
@@ -243,8 +274,12 @@ const TAB = {
       <p class="muted">Дёшево — больше клиентов и репутации, но ниже оплата. Дорого — наоборот.</p>
       <div class="row"><span class="muted">${S.promo ? `Идёт реклама: ещё ${S.promo} ч` : 'Реклама: вдвое больше клиентов на двое суток'}</span><button class="btn sm" type="button" data-act="promoBuy" ${S.promo || S.money < 1000 * repLevel() ? 'disabled' : ''}>Запустить · ${fmt$(1000 * repLevel())}</button></div>${acct}
       ${marketHtml()}
-      <h3>Загрузка в пик: контракты / мощность</h3>${['cpu', 'sto', 'gpu'].map(capRow).join('')}
-      <p class="muted">Нагрузка клиентов меняется по часам: сайты пикуют днём, игры и видео вечером, ИИ — круглые сутки. Не хватит мощности — упадёт аптайм и репутация.</p>
+      <h3>Пик по договорам / мощность</h3>${['cpu', 'sto', 'gpu'].map(capRow).join('')}
+      <p class="muted">Нагрузка клиентов меняется по часам: сайты пикуют днём, игры и видео вечером, рендер ночью, ИИ — круглые сутки. Клиенты с разными пиками уживаются на одном железе: смотрите, как предложение ложится на график. Не хватит мощности — упадёт аптайм и репутация.</p>
+      ${['cpu', 'sto', 'gpu'].filter((k) => S.peak[k] > 0).map((k) => `<div class="row meta"><span>${TYPES[k].name} за сутки</span><span>сейчас клиенты тянут ${fmtN(S.dem[k])} ${TYPES[k].unit}</span></div>${loadChart(k)}`).join('')}
+      <h3>Овербукинг</h3>
+      <div class="row"><span class="muted">Продавать мощности</span><div class="seg">${OVERSELL.map((v, n) => `<button type="button" data-act="policy" data-a="oversell:${n}" aria-pressed="${(S.policy.oversell || 0) === n}">${Math.round(v * 100)}%</button>`).join('')}</div></div>
+      <p class="muted">Клиенты обычно используют 55–85% договора, поэтому мощность можно продать с запасом. Но в пиковый спрос и на рыночном буме все тянут почти всё${oversell() > 1 ? `: при ${Math.round(oversell() * 100)}% не хватит до ${Math.round((1 - 1 / oversell()) * 100)}% мощности и посыплются SLA` : ', поэтому 100% — без риска'}. По этому уровню работают аккаунт-менеджер и завхоз.</p>
       <h3>Предложения</h3><div class="list">${offers || '<p class="muted">Новых предложений пока нет. Менеджеры продаж приводят больше клиентов.</p>'}</div>
       <h3>Активные контракты (${S.contracts.length})</h3><div class="list">${active || '<p class="muted">Нет контрактов — серверы простаивают.</p>'}</div>`;
   },
@@ -253,8 +288,9 @@ const TAB = {
     return `<h3>Персонал · зарплаты ${fmt$(total)}/день</h3><div class="list">${Object.keys(STAFF).map((k) => {
       const R = STAFF[k];
       const busy = k === 'admin' ? ` · заняты ${S.jobs.length}` : '';
-      const segBtn = (key, v, label) => `<button type="button" data-act="policy" data-a="${key}:${v}" aria-pressed="${String(S.policy[key]) === String(key === 'racks' ? v === 1 : v)}">${label}</button>`;
-      const pol = k === 'buyer' ? `<div class="row"><span class="muted">Запас мощности</span><div class="seg">${[0.1, 0.25, 0.5].map((v) => segBtn('headroom', v, `${v * 100}%`)).join('')}</div></div>
+      const segBtn = (key, v, label) => `<button type="button" data-act="policy" data-a="${key}:${v}" aria-pressed="${String(S.policy[key]) === String(key === 'racks' || key === 'quick' ? v === 1 : v)}">${label}</button>`;
+      const pol = k === 'admin' ? `<div class="row"><span class="muted">Как чинят</span><div class="seg">${segBtn('quick', 0, 'По-честному')}${segBtn('quick', 1, 'На скорую руку')}</div></div>
+        <p class="muted">${S.policy.quick ? 'За 1 ч вместо 2, но каждый ремонт добавляет технический долг зала.' : 'Ремонт идёт 2 ч, зато без костылей.'}</p>` : k === 'buyer' ? `<div class="row"><span class="muted">Запас мощности</span><div class="seg">${[0.1, 0.25, 0.5].map((v) => segBtn('headroom', v, `${v * 100}%`)).join('')}</div></div>
         <div class="row"><span class="muted">Не тратить ниже</span><div class="seg">${[0, 5000, 25000, 100000].map((v) => segBtn('reserve', v, fmt$(v))).join('')}</div></div>
         <div class="row"><span class="muted">Ставить новые стойки</span><div class="seg">${segBtn('racks', 1, 'Да')}${segBtn('racks', 0, 'Нет')}</div></div>` : '';
       return `<div class="item"><div class="row"><b>${R.name}</b><span class="meta">${fmt$(R.pay)}/день</span></div><p class="muted">${R.desc}</p>${pol}

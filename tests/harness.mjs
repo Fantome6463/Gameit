@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const SIM_FILES = [
   'core', 'data', 'state', 'save', 'sound', 'contracts',
-  'sim-network', 'sim-assembly', 'sim-tick', 'sim-mail', 'sim-economy', 'sim-procurement', 'actions',
+  'sim-network', 'sim-assembly', 'sim-tick', 'sim-debt', 'sim-load', 'sim-mail', 'sim-economy', 'sim-procurement', 'actions',
 ];
 
 // Элемент-пустышка: любое свойство и любой вызов допустимы и ничего не делают.

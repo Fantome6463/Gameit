@@ -241,16 +241,17 @@ const ACT = {
     S.promo = 48;
     log(`Рекламная кампания на двое суток за ${fmt$(cost)}`, 'good');
   },
-  repairhall() {
+  repairhall(a) {
+    const quick = a === 'quick';
     let n = 0;
     for (const t of S.halls[S.cur].grid) {
       if (!t || t.k !== 'rack' || !t.broken) continue;
-      const cost = t.s.slice(t.s.length - t.broken).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
+      const cost = quick ? quickCost(t) : repairCost(t);
       if (S.money < cost) break;
       S.money -= cost; S.today.other += cost;
-      n += t.broken; t.broken = 0; t.lastBroken = 0;
+      n += fixRack(S.cur, t, quick);
     }
-    if (n) { Sound.coin(); log(`Починено серверов: ${n}`, 'good'); }
+    if (n) { Sound.coin(); log(`Починено серверов: ${n}${quick ? ' — на изоленте, долг зала растёт' : ''}`, quick ? 'warn' : 'good'); }
   },
   bid(a) { if (S.tender) S.tender.bid = a === 'off' ? null : Number(a); },
   buyrival(a) {
@@ -267,7 +268,7 @@ const ACT = {
   },
   policy(a) {
     const [k, v] = a.split(':');
-    S.policy[k] = k === 'racks' ? v === '1' : Number(v);
+    S.policy[k] = k === 'racks' || k === 'quick' ? v === '1' : Number(v);
   },
   mailans(a) {
     const [id, ans] = a.split(':');
@@ -285,14 +286,21 @@ const ACT = {
     S.money += back;
     refreshHall(S.sel.h);
   },
-  repair() {
+  repair(a) {
     const t = selTile();
     if (!t || !t.broken) return;
-    const cost = t.s.slice(t.s.length - t.broken).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
-    if (!spend(cost)) return;
-    t.broken = 0; t.lastBroken = 0;
+    const quick = a === 'quick';
+    if (!spend(quick ? quickCost(t) : repairCost(t))) return;
+    fixRack(S.sel.h, t, quick);
     Sound.coin();
-    log(`Стойка ${tileName(S.sel.h, S.sel.i)} починена вручную`, 'good');
+    log(quick ? `Стойка ${tileName(S.sel.h, S.sel.i)} починена на изоленте. Технический долг зала растёт` : `Стойка ${tileName(S.sel.h, S.sel.i)} починена вручную`, quick ? 'warn' : 'good');
+  },
+  refactor() {
+    const hi = S.cur, cost = refactorCost(hi);
+    if (!cost || !spend(cost)) return;
+    S.halls[hi].debt = 0;
+    Sound.win();
+    log(`Рефакторинг в «${HALLS[hi].name}»: костыли убраны, технический долг погашен`, 'good');
   },
   swremove() {
     const t = selTile(); if (!isSwitch(t)) return;

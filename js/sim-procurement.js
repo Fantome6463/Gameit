@@ -50,7 +50,7 @@ function autoBuy() {
     const m = bestModel(type);
     if (!m) continue;
     const M = MODELS[m];
-    let need = S.peak[type] * (1 + P.headroom) - S.cap[type];
+    let need = (S.peak[type] / oversell()) * (1 + P.headroom) - S.cap[type];
     while (need > 0 && bought < 10) {
       const price = priceOf(m);
       if (S.money - price < P.reserve) break;

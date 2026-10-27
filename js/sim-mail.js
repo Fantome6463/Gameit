@@ -167,9 +167,8 @@ function signOffer(o, auto) {
 }
 function autoSign() {
   const L = repLevel();
-  const spare = {};
-  for (const k in S.cap) spare[k] = S.cap[k] - S.peak[k];
+  // Подписывает, пока пик по договорам (с учётом суточных профилей) влезает в мощность × уровень продаж с запасом 10%.
   S.offers.filter((o) => o.lvl <= L).sort((a, b) => b.pay / b.amount - a.pay / a.amount).forEach((o) => {
-    if (spare[o.type] >= o.amount * 1.1) { spare[o.type] -= o.amount; signOffer(o, true); }
+    if (planPeak(o.type, o) * 1.1 <= S.cap[o.type] * oversell()) signOffer(o, true);
   });
 }

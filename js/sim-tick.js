@@ -25,13 +25,15 @@ function tick() {
   for (const k in cap) cap[k] *= techMult(k);
 
   // demand
-  const dem = { cpu: 0, sto: 0, gpu: 0 }, peak = { cpu: 0, sto: 0, gpu: 0 };
-  S.contracts.forEach((c) => { dem[c.type] += c.amount * PROF[KINDS[c.kind].prof](S.hour); peak[c.type] += c.amount; });
+  usageTick();
+  const dem = { cpu: 0, sto: 0, gpu: 0 }, peak = {};
+  S.contracts.forEach((c) => { dem[c.type] += c.amount * PROF[KINDS[c.kind].prof](S.hour) * c.use; });
+  for (const k in dem) peak[k] = planPeak(k);
   // network
   let bwDem = 0, bwCap = 0;
   S.contracts.forEach((c) => {
     const cdn = hasTech('cdn') && (c.kind === 'web' || c.kind === 'media' || c.kind === 'game') ? 0.6 : 1;
-    bwDem += c.amount * BW[c.kind] * PROF[KINDS[c.kind].prof](S.hour) * cdn;
+    bwDem += c.amount * BW[c.kind] * PROF[KINDS[c.kind].prof](S.hour) * c.use * cdn;
   });
   S.halls.forEach((H) => { if (H.open && !H.dark) bwCap += NET_TIERS[H.net || 0].cap; });
   if (ev && ev.type === 'ddos') {
@@ -87,7 +89,7 @@ function tick() {
       if (t.k === 'miner') { if (t.temp > 44 && !t.fire && Math.random() < 0.04) { t.fire = 5; t.fireAge = 0; log(`ПОЖАР на ASIC-ферме, клетка ${tileName(hi, i)}!`, 'crit'); Sound.alarm(); alertPause('пожар'); } return; }
       // failures (wear grows with age; engineers slow it down)
       t.age = (t.age || 0) + 1 / (1 + 0.15 * S.staff.eng);
-      const p = fail * (t.temp > 32 ? 2.5 : 1) * (t.temp > 40 ? 4 : 1) * (1 + t.age / 480);
+      const p = fail * (t.temp > 32 ? 2.5 : 1) * (t.temp > 40 ? 4 : 1) * (1 + t.age / 480) * debtFailMult(hi);
       const working = t.s.length - t.broken;
       for (let n = 0; n < working; n++) if (Math.random() < p) t.broken++;
       if (t.broken > 0 && t.broken > (t.lastBroken || 0)) log(`Сломался сервер в ${HALLS[hi].name}, стойка ${tileName(hi, i)}`, 'warn');
@@ -241,6 +243,7 @@ function tick() {
 
   // staff jobs
   runJobs();
+  debtTick();
   netTick();
   asmTick();
 
@@ -273,7 +276,7 @@ function runJobs() {
     if (j.t >= j.travel + j.work) {
       const t = S.halls[j.h].grid[j.i];
       if (j.kind === 'fire') { t.fire = 0; log(`Админ потушил стойку ${tileName(j.h, j.i)}`, 'good'); }
-      else { log(`Админ починил ${t.broken} серв. в стойке ${tileName(j.h, j.i)}`, 'good'); t.broken = 0; t.lastBroken = 0; }
+      else { const n = fixRack(j.h, t, j.quick); log(`Админ починил ${n} серв. в стойке ${tileName(j.h, j.i)}${j.quick ? ' на скорую руку' : ''}`, j.quick ? '' : 'good'); }
       j.done = true;
     }
   });
@@ -295,7 +298,8 @@ function runJobs() {
     const D = HALLS[j.h];
     const dist = (j.i % D.w) + Math.abs(Math.floor(j.i / D.w) - D.h / 2);
     j.travel = Math.max(1, Math.ceil(dist / 4));
-    j.work = j.kind === 'fire' ? 1 : hasTech('aiops') ? 1 : 2;
+    j.quick = j.kind === 'repair' && !!S.policy.quick;
+    j.work = j.kind === 'fire' || j.quick || hasTech('aiops') ? 1 : 2;
     j.t = 0;
     S.jobs.push(j);
   });
