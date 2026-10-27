@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Серверная</title>
+<title>ЦОД Магнат</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;800&display=swap">
 <style>
-/* Layout: a night-shift machine room — the racks are the stage, a side console holds the inspector and the log. Single dark look by choice. */
+/* Layout: tycoon console — the hall floor plan is the stage on the left, management tabs on the right. Single dark look by choice. */
 :root {
-  --room: #0c1116;
-  --panel: #141b22;
-  --metal: #1d2630;
-  --metal-hi: #2a3642;
+  --room: #0b1015;
+  --panel: #131a21;
+  --panel-2: #18212a;
+  --metal-hi: #26323d;
   --bay: #090d11;
-  --line: #2a3440;
+  --line: #26313c;
   --fg: #d6e0ea;
   --dim: #7a8897;
   --accent: #6cb4ff;
@@ -24,8 +24,10 @@
   --ok: #4fd18b;
   --warn: #f2b24a;
   --crit: #ff5f5f;
-  --led-off: #2b343d;
-  --scrim: rgba(6, 9, 12, .78);
+  --cpu: #4a8fd6;
+  --sto: #a184e6;
+  --gpu: #e8913f;
+  --scrim: rgba(5, 8, 11, .8);
   --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -36,222 +38,172 @@
 html, body { min-height: 100%; }
 body {
   margin: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(108, 180, 255, .08), transparent 70%),
-    var(--room);
+  background: radial-gradient(ellipse 70% 40% at 30% -10%, rgba(108, 180, 255, .07), transparent 70%), var(--room);
   color: var(--fg);
   font: 14px/1.45 var(--f-body);
 }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.wrap {
-  max-width: 1200px;
-  margin: 0 auto;
+.app {
+  max-width: 1440px; margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 18px 40px;
-  display: grid;
-  gap: 16px;
+  padding-block: 14px 40px;
+  display: grid; gap: 12px;
 }
 
-/* Header */
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
-.brand { min-width: 0; }
-.brand h1 {
-  margin: 0;
-  font: 800 26px/1 var(--f-display);
-  letter-spacing: .02em;
-  text-transform: uppercase;
-}
-.brand p { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
-.stats { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 520px; }
-.stat {
-  display: grid; gap: 2px; align-content: start;
-  padding: 6px 10px; min-width: 76px;
+/* Top bar */
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.logo { font: 800 22px/1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
+.logo span { color: var(--accent); }
+.res { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 600px; }
+.chip {
+  display: grid; gap: 1px; padding: 5px 10px; min-width: 70px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
 }
-.stat.wide { flex: 1 1 150px; }
-.stat .k { font: 500 10px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-.stat .v { font: 600 16px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.meter { display: block; height: 4px; background: var(--bay); border-radius: 2px; overflow: hidden; }
-.meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s linear, background-color .3s; }
-.v.neg { color: var(--crit); }
-
-.controls { display: flex; gap: 8px; align-items: center; }
+.chip .k { font: 500 9.5px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.chip .v { font: 600 15px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v.pos { color: var(--ok); } .v.neg { color: var(--crit); }
+.stars { color: var(--warn); letter-spacing: 1px; }
+.stars i { font-style: normal; color: var(--metal-hi); }
+.ctl { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 34px; padding: 6px 12px;
+  min-height: 32px; padding: 5px 11px;
   background: var(--metal-hi); border: 1px solid var(--line); border-radius: 4px;
-  cursor: pointer; font-weight: 500;
+  cursor: pointer; font-weight: 500; font-size: 13px; text-align: left;
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
-.btn:disabled { opacity: .42; cursor: not-allowed; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn.danger { color: var(--crit); }
+.btn.hot { background: var(--crit); border-color: var(--crit); color: #fff; font-weight: 600; animation: pulse .6s infinite; }
+.btn.sm { min-height: 26px; padding: 2px 8px; font-size: 12px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
-.seg button {
-  min-height: 34px; padding: 6px 10px; border: 0; background: var(--panel); cursor: pointer;
-  font: 600 12px var(--f-mono);
-}
+.seg button { min-height: 32px; padding: 4px 9px; border: 0; background: var(--panel); cursor: pointer; font: 600 12px var(--f-mono); }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
-/* Event banner */
+.goal {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+}
+.goal b { font: 600 10px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.goal span { flex: 1 1 240px; }
+.goal em { font: 600 12px var(--f-mono); font-style: normal; color: var(--ok); }
+
 .event {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
-  padding: 10px 14px;
-  background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 4px;
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--crit); border-radius: 4px;
 }
-.event.crit { border-left-color: var(--crit); }
-.event .what { flex: 1 1 260px; min-width: 0; }
-.event strong { display: block; font-weight: 600; }
-.event span { color: var(--dim); font-size: 13px; }
-.event .left { font: 600 12px var(--f-mono); color: var(--warn); }
+.event.mild { border-left-color: var(--warn); }
+.event.good { border-left-color: var(--ok); }
+.event strong { font-weight: 600; }
+.event span { color: var(--dim); flex: 1 1 260px; }
+.event .left { font: 600 12px var(--f-mono); color: var(--warn); flex: 0 0 auto; }
 
-/* Floor */
-.floor { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
-.racks { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; }
-
-.rack {
-  position: relative;
-  padding: 8px 8px 10px;
-  background: linear-gradient(180deg, var(--metal-hi), var(--metal) 40px);
-  border: 1px solid var(--line); border-radius: 6px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 24px rgba(0, 0, 0, .35);
+/* Main */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 14px; align-items: start; }
+.floor { display: grid; gap: 8px; min-width: 0; }
+.halls { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
+.halls button {
+  flex: 0 0 auto; display: grid; gap: 0; text-align: left;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px 4px 0 0; background: var(--panel); cursor: pointer;
 }
-.rack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 0 2px 8px; }
-.rack-head b { font: 600 12px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
-.rack-head span { font: 500 10.5px var(--f-mono); color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.rack-head span.over { color: var(--crit); }
-.rack-body { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; }
-.rail {
-  display: grid; grid-auto-rows: 38px; gap: 3px;
-  font: 500 9px/38px var(--f-mono); color: var(--dim); text-align: center;
-  background: repeating-linear-gradient(180deg, transparent 0 8px, var(--bay) 8px 11px) center / 4px 100% no-repeat;
+.halls button small { font: 500 10.5px var(--f-mono); color: var(--dim); }
+.halls button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); }
+.halls button.locked { opacity: .6; }
+.halls button.alarm small { color: var(--crit); }
+.hallinfo { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 12px var(--f-mono); color: var(--dim); }
+.hallinfo b { color: var(--fg); font-weight: 600; }
+.hallinfo .over { color: var(--crit); }
+.canvasbox {
+  position: relative; background: var(--bay); border: 1px solid var(--line); border-radius: 6px;
+  overflow: hidden; display: grid; place-items: center; padding: 8px;
 }
-.rail span { background: var(--metal); line-height: 14px; align-self: center; }
-.units { display: grid; grid-auto-rows: 38px; gap: 3px; min-width: 0; }
+canvas { display: block; touch-action: manipulation; cursor: pointer; max-width: 100%; }
+.lockcard { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; padding: 16px; background: rgba(9, 13, 17, .78); }
+.lockcard h3 { margin: 0; font: 800 18px var(--f-display); text-transform: uppercase; }
+.lockcard p { margin: 0; color: var(--dim); }
+.tools { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tools .btn { flex-direction: column; align-items: flex-start; gap: 0; padding: 4px 9px; line-height: 1.2; }
+.tools .btn small { font: 500 10.5px var(--f-mono); color: var(--dim); }
+.tools .btn[aria-pressed="true"] { border-color: var(--accent); background: rgba(108, 180, 255, .16); }
+.tools .sep { flex: 1 1 0; }
 
-.unit {
-  position: relative;
-  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 7px;
-  padding: 0 7px;
-  background: var(--bay); border: 1px solid var(--line); border-radius: 3px;
-  font: 500 11px var(--f-mono); text-align: left;
-  cursor: pointer; overflow: hidden;
+/* Side */
+.side { display: grid; gap: 12px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tabs button {
+  flex: 1 0 auto; padding: 9px 10px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer;
+  font: 600 12px var(--f-body); color: var(--dim);
 }
-.unit:hover { border-color: var(--metal-hi); background: #0d1318; }
-.unit.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.unit .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.unit .name b { color: var(--dim); font-weight: 400; margin-left: 4px; }
-.unit .meta { color: var(--dim); font-variant-numeric: tabular-nums; }
-.unit .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; }
-.unit .bar i { display: block; height: 100%; width: 0; background: var(--accent); opacity: .7; transition: width .2s linear; }
+.tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs button sup { font: 600 9px var(--f-mono); color: var(--accent); }
+.tabbody { padding: 14px; max-height: 640px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.tabbody h3 { margin: 0; font: 600 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tabbody p { margin: 0; }
+.muted { color: var(--dim); font-size: 13px; }
+.ttl { font-weight: 600; font-size: 15px; }
+.kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.kv dt { color: var(--dim); }
+.kv dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .crit { color: var(--crit); }
+.list { display: grid; gap: 8px; }
+.item { display: grid; gap: 6px; padding: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; }
+.item.done { opacity: .55; }
+.item.cur { border-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; justify-content: space-between; }
+.row > :first-child { min-width: 0; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font: 600 10.5px var(--f-mono); background: var(--metal-hi); white-space: nowrap; }
+.tag.cpu { background: rgba(74, 143, 214, .25); color: #9cc6f2; }
+.tag.sto { background: rgba(161, 132, 230, .25); color: #c9b8f5; }
+.tag.gpu { background: rgba(232, 145, 63, .25); color: #f4bd88; }
+.meta { font: 500 12px var(--f-mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+.bar { height: 5px; background: var(--bay); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); }
+.cap { display: grid; grid-template-columns: 74px 1fr auto; gap: 8px; align-items: center; font: 500 12px var(--f-mono); }
+.slots { display: grid; gap: 4px; }
+.slot { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 5px 8px; background: var(--bay); border-radius: 3px; font: 500 12px var(--f-mono); }
+.slot.bad { color: var(--crit); }
+.shop { display: grid; gap: 6px; }
+.shop .btn { justify-content: space-between; padding: 7px 10px; }
+.shop .btn small { display: block; font-weight: 400; color: var(--dim); font-size: 11.5px; }
+.price { font: 600 12.5px var(--f-mono); white-space: nowrap; }
+.chart { width: 100%; height: 120px; display: block; }
 
-.unit.empty {
-  background: transparent; border-style: dashed; color: var(--dim);
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.unit.empty:hover { color: var(--fg); border-color: var(--accent); }
-
-.leds { display: grid; gap: 4px; }
-.led { width: 6px; height: 6px; border-radius: 50%; background: var(--led-off); }
-.unit[data-st="ok"] .pwr, .unit[data-st="disk"] .pwr { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
-.unit[data-st="boot"] .pwr { background: var(--warn); animation: blink .5s steps(2) infinite; }
-.unit[data-st="down"] .pwr { background: var(--crit); box-shadow: 0 0 6px var(--crit); animation: blink .9s steps(2) infinite; }
-.unit[data-st="disk"] .act { background: var(--warn); }
-.unit.busy .act { background: var(--accent); animation: blink var(--blink, .6s) steps(2) infinite; }
-.unit[data-st="down"] { border-color: rgba(255, 95, 95, .5); }
-.unit[data-st="down"] .name, .unit[data-st="off"] .name { color: var(--dim); }
-.unit[data-heat="warm"] .meta { color: var(--warn); }
-.unit[data-heat="hot"] .meta { color: var(--crit); font-weight: 600; }
-.unit[data-heat="hot"] { background: linear-gradient(90deg, rgba(255, 95, 95, .14), var(--bay) 60%); }
-
-.fan {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: conic-gradient(var(--accent) 0 40deg, transparent 0 120deg, var(--accent) 0 160deg, transparent 0 240deg, var(--accent) 0 280deg, transparent 0);
-  animation: spin .6s linear infinite;
-}
-.unit[data-st="broken"] .fan { animation: none; background: conic-gradient(var(--crit) 0 40deg, transparent 0 120deg, var(--crit) 0 160deg, transparent 0 240deg, var(--crit) 0 280deg, transparent 0); }
-.unit[data-st="broken"] .meta { color: var(--crit); }
-.batt { width: 10px; height: 14px; border: 1px solid var(--ok); border-radius: 2px; padding: 1px; display: flex; align-items: flex-end; }
-.batt i { display: block; width: 100%; height: 70%; background: var(--ok); }
-.unit[data-st="drain"] .batt { border-color: var(--warn); }
-.unit[data-st="drain"] .batt i { background: var(--warn); animation: blink .8s steps(2) infinite; }
-
-.locked {
-  position: absolute; inset: 34px 8px 10px; display: grid; place-content: center; gap: 8px; text-align: center;
-  background: rgba(9, 13, 17, .82); border: 1px dashed var(--line); border-radius: 4px; padding: 12px;
-}
-.locked p { margin: 0; color: var(--dim); font-size: 12px; }
-
-@keyframes blink { 50% { opacity: .25; } }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Side console */
-.side { display: grid; gap: 14px; min-width: 0; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
-.panel h2 { margin: 0 0 10px; font: 600 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-.insp-title { margin: 0 0 2px; font: 600 15px var(--f-body); }
-.insp-sub { margin: 0 0 12px; color: var(--dim); font-size: 13px; }
-.insp-close { display: none; }
-dl.kv { margin: 0 0 14px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 13px; }
-dl.kv dt { color: var(--dim); }
-dl.kv dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
-dd.ok { color: var(--ok); } dd.warn { color: var(--warn); } dd.crit { color: var(--crit); }
-.actions { display: grid; gap: 8px; }
-.shop { display: grid; gap: 8px; }
-.shop .btn { justify-content: space-between; text-align: left; padding: 9px 12px; }
-.shop .btn small { display: block; color: var(--dim); font-size: 12px; font-weight: 400; }
-.shop .btn.primary small { color: inherit; opacity: .75; }
-.price { font: 600 13px var(--f-mono); white-space: nowrap; }
-
-.log ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 300px; overflow: auto; font-size: 12.5px; }
-.log li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; }
+.log ol { list-style: none; margin: 0; padding: 12px 14px; display: grid; gap: 5px; max-height: 220px; overflow: auto; font-size: 12.5px; }
+.log li { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; }
 .log time { font: 500 11px/1.6 var(--f-mono); color: var(--dim); }
-.log li.warn span { color: var(--warn); }
-.log li.crit span { color: var(--crit); }
-.log li.good span { color: var(--ok); }
+.log li.warn span { color: var(--warn); } .log li.crit span { color: var(--crit); } .log li.good span { color: var(--ok); }
 
-/* Overlay */
+.toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 40;
+  transform: translateX(-50%); max-width: calc(100% - 32px);
+  padding: 10px 16px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5); font-weight: 500;
+}
+.toast.bad { border-color: var(--crit); }
+.toast.good { border-color: var(--ok); }
+
 .overlay {
-  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
   background: var(--scrim); backdrop-filter: blur(3px);
 }
-.card {
-  width: min(480px, 100%); max-height: 100%; overflow: auto;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
-}
-.card h2 { margin: 0 0 8px; font: 800 22px/1.15 var(--f-display); text-transform: uppercase; text-wrap: balance; }
-.card p { margin: 0 0 12px; color: var(--dim); }
-.card ul { margin: 0 0 18px; padding-left: 18px; display: grid; gap: 6px; }
-.card .btn { width: 100%; min-height: 42px; }
-.card .score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 18px; }
+.card { width: min(540px, 100%); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; display: grid; gap: 12px; }
+.card h2 { margin: 0; font: 800 24px/1.15 var(--f-display); text-transform: uppercase; text-wrap: balance; }
+.card p { margin: 0; color: var(--dim); }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+.card .btn { min-height: 42px; justify-content: center; }
 
-@media (max-width: 860px) {
-  .floor { grid-template-columns: minmax(0, 1fr); }
-  .inspector:not(.open) { display: none; }
-  .inspector.open {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    max-height: 60vh; overflow: auto;
-    border-radius: 10px 10px 0 0; border-bottom: 0;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, .55);
-  }
-  .insp-close { display: inline-flex; float: right; }
-  .wrap { padding-bottom: 50vh; }
-}
-@media (max-width: 420px) {
-  .racks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .rack { padding: 6px 5px 8px; }
-  .rack-body { grid-template-columns: 12px minmax(0, 1fr); gap: 3px; }
-  .unit { padding: 0 5px; gap: 5px; font-size: 10.5px; }
-  .unit .name b { display: none; }
+@keyframes pulse { 50% { opacity: .7; } }
+
+@media (max-width: 1000px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .tabbody { max-height: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -259,531 +211,1229 @@ dd.ok { color: var(--ok); } dd.warn { color: var(--warn); } dd.crit { color: var
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <h1>Серверная</h1>
-      <p>Смена дежурного сисадмина. Сервис должен быть в сети.</p>
+<div class="app">
+  <header class="bar">
+    <div class="logo">ЦОД <span>Магнат</span></div>
+    <div class="res">
+      <div class="chip"><span class="k">Счёт</span><span class="v" id="rMoney">$0</span></div>
+      <div class="chip"><span class="k">За 24 часа</span><span class="v" id="rProfit">$0</span></div>
+      <div class="chip"><span class="k">Репутация</span><span class="v stars" id="rRep"></span></div>
+      <div class="chip"><span class="k">Дата</span><span class="v" id="rDate">День 1, 08:00</span></div>
+      <div class="chip"><span class="k">Вычисления, ядер</span><span class="v" id="rCpu">0 / 0</span></div>
+      <div class="chip"><span class="k">Хранение, ТБ</span><span class="v" id="rSto">0 / 0</span></div>
+      <div class="chip"><span class="k">ИИ, GPU</span><span class="v" id="rGpu">0 / 0</span></div>
     </div>
-    <div class="stats">
-      <div class="stat"><span class="k">День</span><span class="v" id="sDay">1</span></div>
-      <div class="stat"><span class="k">Время</span><span class="v" id="sTime">08:00</span></div>
-      <div class="stat"><span class="k">Бюджет</span><span class="v" id="sMoney">$400</span></div>
-      <div class="stat wide"><span class="k">Трафик, тыс. запр/с</span><span class="v" id="sLoad">0 / 0</span><span class="meter"><i id="mLoad"></i></span></div>
-      <div class="stat wide"><span class="k">Репутация · SLA</span><span class="v" id="sRep">100%</span><span class="meter"><i id="mRep"></i></span></div>
-    </div>
-    <div class="controls">
-      <button class="btn" id="bPause" type="button">Пауза</button>
-      <div class="seg" role="group" aria-label="Скорость времени">
-        <button type="button" data-speed="1" aria-pressed="true">1×</button>
-        <button type="button" data-speed="2" aria-pressed="false">2×</button>
-        <button type="button" data-speed="4" aria-pressed="false">4×</button>
+    <div class="ctl">
+      <div class="seg" role="group" aria-label="Скорость">
+        <button type="button" data-act="pause" id="bPause" aria-pressed="false">II</button>
+        <button type="button" data-act="speed" data-a="1" aria-pressed="true">1×</button>
+        <button type="button" data-act="speed" data-a="3" aria-pressed="false">3×</button>
+        <button type="button" data-act="speed" data-a="8" aria-pressed="false">8×</button>
       </div>
+      <button class="btn" type="button" data-act="sound" id="bSound">Звук</button>
+      <button class="btn" type="button" data-act="menu">Меню</button>
     </div>
   </header>
 
+  <div class="goal" id="goal"></div>
   <div class="event" id="event" hidden></div>
 
-  <main class="floor">
-    <section class="racks" id="racks" aria-label="Стойки"></section>
-    <aside class="side">
-      <div class="panel inspector" id="insp"></div>
-      <div class="panel log">
-        <h2>Журнал</h2>
-        <ol id="log"></ol>
+  <main class="main">
+    <section class="floor">
+      <nav class="halls" id="halls" aria-label="Залы"></nav>
+      <div class="hallinfo" id="hallinfo"></div>
+      <div class="canvasbox" id="cbox">
+        <canvas id="cv" aria-label="План зала"></canvas>
+        <div class="lockcard" id="lockcard" hidden></div>
       </div>
+      <div class="tools" id="tools"></div>
+    </section>
+    <aside class="side">
+      <div class="panel">
+        <nav class="tabs" id="tabs"></nav>
+        <div class="tabbody" id="tab"></div>
+      </div>
+      <div class="panel log"><ol id="log"></ol></div>
     </aside>
   </main>
 </div>
-
-<div class="overlay" id="overlay" hidden>
-  <div class="card" id="card"></div>
-</div>
+<div class="toast" id="toast" hidden></div>
+<div class="overlay" id="overlay" hidden><div class="card" id="card"></div></div>
 
 <script>
 (() => {
+  'use strict';
   const $ = (s) => document.querySelector(s);
-  const LETTERS = 'ABCD';
-  const UNITS = 8;
-  const TICK_MIN = 5;          // game minutes per tick
-  const TICK_MS = 220;         // real ms per tick at 1x
-  const CAP = [0, 10, 22, 36]; // capacity per server level, тыс. запр/с
-  const HEAT = [0, 12, 20, 28];// heat at full load per level
-  const COOL = 30;             // heat removed by one cooler
-  const PRICE = { server: 150, cooler: 90, ups: 120, disk: 60, fix: 50, filter: 200, up: { 2: 220, 3: 380 }, rack: { 2: 500, 3: 900 } };
-  const BEST_KEY = 'serverroom.best';
+  const HOUR_MS = 520;
+  const SAVE_KEY = 'cod-magnat.save.v1';
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randi = (a, b) => Math.floor(rand(a, b + 1));
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  // ================= DATA =================
+  const TYPES = {
+    cpu: { name: 'Вычисления', unit: 'ядер', rate: 0.5 },
+    sto: { name: 'Хранение', unit: 'ТБ', rate: 0.15 },
+    gpu: { name: 'ИИ', unit: 'GPU', rate: 3.2 },
+  };
+  const MODELS = {
+    b1: { name: 'Bronze 1U', type: 'cpu', cap: 10, heat: 3, kw: 0.4, price: 300, tier: 1 },
+    b2: { name: 'Silver 2U', type: 'cpu', cap: 25, heat: 5, kw: 0.6, price: 900, tier: 2, req: 'silver' },
+    b3: { name: 'Platinum 4U', type: 'cpu', cap: 60, heat: 8, kw: 1.0, price: 2500, tier: 3, req: 'platinum' },
+    s1: { name: 'Дисковая полка', type: 'sto', cap: 40, heat: 2, kw: 0.3, price: 400, tier: 1 },
+    s2: { name: 'All-flash массив', type: 'sto', cap: 150, heat: 3, kw: 0.5, price: 1800, tier: 2, req: 'flash' },
+    g1: { name: 'GPU-узел', type: 'gpu', cap: 8, heat: 12, kw: 2.0, price: 4000, tier: 2, req: 'gpu' },
+    g2: { name: 'GPU-кластер', type: 'gpu', cap: 32, heat: 22, kw: 4.0, price: 14000, tier: 3, req: 'gpu2' },
+  };
+  const RACK_SLOTS = 6;
+  const BUILD = {
+    rack: { name: 'Стойка', price: 200, kw: 0, short: '6 серверов', desc: 'Вмещает 6 серверов любого типа.' },
+    crac: { name: 'Кондиционер', price: 800, kw: 3, cool: 30, r: 1, short: '30 · R1', desc: 'Снимает 30 ед. тепла, делится между стойками в радиусе 1 клетки.' },
+    chiller: { name: 'Чиллер', price: 3500, kw: 6, cool: 95, r: 2, req: 'chiller', short: '95 · R2', desc: 'Снимает 95 ед. тепла в радиусе 2 клеток.' },
+    ups: { name: 'ИБП', price: 1000, kw: 0, backup: 25, short: '25 кВт', desc: 'Держит 25 кВт нагрузки зала при отключении электричества.' },
+    gen: { name: 'Дизель', price: 6000, kw: 0, backup: 150, req: 'diesel', short: '150 кВт', desc: 'Генератор держит 150 кВт при отключении.' },
+    trafo: { name: 'Трансформатор', price: 2500, kw: 0, power: 60, short: '+60 кВт', desc: 'Поднимает лимит мощности зала на 60 кВт.' },
+  };
+  const HALLS = [
+    { name: 'Каморка под лестницей', w: 5, h: 4, kw: 15, amb: 24, price: 0, rent: 0, lvl: 1 },
+    { name: 'Подвал', w: 7, h: 5, kw: 40, amb: 22, price: 8000, rent: 150, lvl: 1 },
+    { name: 'Машинный зал №1', w: 9, h: 6, kw: 120, amb: 21, price: 40000, rent: 600, lvl: 2 },
+    { name: 'Машинный зал №2', w: 10, h: 7, kw: 320, amb: 21, price: 160000, rent: 1800, lvl: 3 },
+    { name: 'Северный ЦОД', w: 12, h: 8, kw: 900, amb: 9, price: 600000, rent: 5000, lvl: 4 },
+    { name: 'Гиперскейл-кампус', w: 14, h: 9, kw: 3000, amb: 18, price: 2500000, rent: 15000, lvl: 5 },
+  ];
+  const TECH = [
+    { id: 'silver', name: 'Серверы Silver', price: 3000, days: 1.5, desc: 'CPU-серверы на 25 ядер.' },
+    { id: 'diesel', name: 'Дизель-генераторы', price: 4000, days: 1, desc: 'Резерв 150 кВт на зал.' },
+    { id: 'chiller', name: 'Чиллеры', price: 5000, days: 1.5, desc: 'Охлаждение 95 ед. в радиусе 2.' },
+    { id: 'flash', name: 'All-flash хранилища', price: 6000, days: 2, desc: 'Хранилища на 150 ТБ.' },
+    { id: 'virt', name: 'Виртуализация', price: 10000, days: 2, req: ['silver'], desc: '+20% мощности CPU.' },
+    { id: 'antiddos', name: 'Анти-DDoS', price: 12000, days: 2, desc: 'DDoS почти не влияет на нагрузку.' },
+    { id: 'fiber', name: 'Второй оптический канал', price: 15000, days: 1.5, desc: 'Экскаватор больше не страшен.' },
+    { id: 'gpu', name: 'GPU-узлы', price: 18000, days: 2.5, req: ['silver'], desc: 'Открывает ИИ-контракты и GPU-серверы.' },
+    { id: 'platinum', name: 'Серверы Platinum', price: 30000, days: 3, req: ['virt'], desc: 'CPU-серверы на 60 ядер.' },
+    { id: 'liquid', name: 'Жидкостное охлаждение', price: 60000, days: 3, req: ['chiller', 'gpu'], desc: 'Тепло GPU-серверов −50%.' },
+    { id: 'k8s', name: 'Kubernetes', price: 80000, days: 3, req: ['virt'], desc: '+25% CPU и +15% хранения.' },
+    { id: 'solar', name: 'Солнечная станция', price: 100000, days: 4, desc: 'Электричество дешевле на 35%.' },
+    { id: 'peering', name: 'Пиринг на точке обмена', price: 150000, days: 3, req: ['fiber'], desc: 'Новые контракты платят на 15% больше.' },
+    { id: 'gpu2', name: 'GPU-кластеры', price: 250000, days: 5, req: ['liquid'], desc: 'GPU-серверы на 32 ускорителя.' },
+    { id: 'aiops', name: 'AIOps', price: 500000, days: 6, req: ['k8s', 'gpu'], desc: 'Поломки −60%, админы чинят вдвое быстрее.' },
+  ];
+  const STAFF = {
+    admin: { name: 'Дежурный админ', pay: 200, desc: 'Сам бегает чинить сломанные серверы и тушить пожары.' },
+    eng: { name: 'Инженер-климатовик', pay: 300, desc: '+8% к охлаждению во всех залах за каждого.', max: 10 },
+    guard: { name: 'Безопасник', pay: 250, desc: 'Тушит пожары за час и гасит DDoS на 15% за каждого.', max: 6 },
+    sales: { name: 'Менеджер продаж', pay: 350, desc: '+1 предложение и +5% к оплате новых контрактов.', max: 5 },
+  };
+  const KINDS = {
+    web: { type: 'cpu', label: 'Сайт', prof: 'day' },
+    game: { type: 'cpu', label: 'Игровые серверы', prof: 'eve' },
+    bank: { type: 'cpu', label: 'Банкинг', prof: 'day', sla: 99.9, lvl: 2 },
+    backup: { type: 'sto', label: 'Бэкапы', prof: 'flat' },
+    media: { type: 'sto', label: 'Видеохостинг', prof: 'eve' },
+    ai: { type: 'gpu', label: 'Обучение ИИ', prof: 'flat', req: 'gpu' },
+    render: { type: 'gpu', label: 'Рендер-ферма', prof: 'night', req: 'gpu' },
+  };
+  const CLIENTS = {
+    web: ['Маркетплейс «Всё по 99»', 'Доставка «Быстрый Ёж»', 'Форум любителей кактусов', 'Такси «Шашечки»', 'Стартап «Убер для котов»', 'Школа «Интернет-урок»', 'Метеобюро «Облачно»'],
+    game: ['Студия «Пиксельбург»', 'Шутер «Окоп-2»', 'MMO «Тридевятое царство»', 'Киберклуб «Респаун»', 'Ферма «Весёлый трактор»'],
+    bank: ['Банк «Надёжный»', 'Банк «Копейка»', 'Финтех «Полкопейки»', 'Кредитный союз «Сундук»'],
+    backup: ['Архив бабушкиных фото', 'Нотариус Ковалёв', 'Библиотека «Пыльная полка»', 'ИП «Всё сохраним»'],
+    media: ['Онлайн-кинотеатр «Попкорн»', 'Радио «Пингвин FM»', 'Видеохостинг «Котики»', 'Сериалы «Ещё одну серию»'],
+    ai: ['Нейросеть «Гена»', 'ИИ-лаборатория «Сингулярность»', 'Стартап «ChatКот»', 'Беспилотник «Ёжик в тумане»'],
+    render: ['Мультстудия «Пластилин»', 'VFX «Взрыв на заднем плане»', 'Архбюро «Квадратный метр»'],
+  };
+  const AMT = {
+    cpu: [[8, 20], [20, 70], [60, 220], [200, 700], [600, 2400]],
+    sto: [[30, 80], [80, 250], [250, 800], [800, 2500], [2500, 8000]],
+    gpu: [[3, 8], [8, 24], [20, 80], [60, 240], [200, 800]],
+  };
+  const SLA_MULT = { 95: 1, 99: 1.25, 99.9: 1.6 };
+  const EVENTS = {
+    outage: { name: 'Отключение электричества', desc: 'Залы, где резерв ИБП и дизелей меньше нагрузки, обесточены.', h: [2, 5], cls: '' },
+    heat: { name: 'Аномальная жара', desc: '+8 °C к воздуху во всех залах, кроме северного.', h: [24, 48], cls: 'mild' },
+    ddos: { name: 'DDoS-атака', desc: 'Нагрузка на CPU ×1,6. Помогают безопасники и Анти-DDoS.', h: [4, 10], cls: '' },
+    fiber: { name: 'Экскаватор перерубил оптику', desc: 'Клиенты получают только 40% сервиса.', h: [2, 4], cls: '', skip: 'fiber' },
+    crypto: { name: 'Криптобум', desc: 'Новые GPU-контракты платят вдвое.', h: [48, 72], cls: 'good' },
+  };
+  const PROF = {
+    day: (h) => 0.4 + 0.6 * bell(h, 14, 4.5),
+    eve: (h) => 0.35 + 0.65 * bell(h, 21, 3.5),
+    night: (h) => 0.35 + 0.65 * bell(h, 3, 4),
+    flat: () => 1,
+  };
+  function bell(h, c, s) { let d = Math.abs(h - c); d = Math.min(d, 24 - d); return Math.exp(-(d * d) / (2 * s * s)); }
+
+  const GOALS = [
+    { t: 'Подпишите первый контракт во вкладке «Контракты»', ok: () => S.stats.signed >= 1, r: 500 },
+    { t: 'Установите 6 серверов', ok: () => countServers() >= 6, r: 800 },
+    { t: 'Наймите дежурного админа', ok: () => S.staff.admin >= 1, r: 600 },
+    { t: 'Выполните 3 контракта без нарушения SLA', ok: () => S.stats.done >= 3, r: 2000 },
+    { t: 'Арендуйте Подвал', ok: () => S.halls[1].open, r: 3000 },
+    { t: 'Изучите любую технологию', ok: () => Object.keys(S.tech).length >= 1, r: 2000 },
+    { t: 'Поднимите репутацию до ★★★', ok: () => repLevel() >= 3, r: 6000 },
+    { t: 'Изучите GPU-узлы и возьмите ИИ-контракт', ok: () => S.contracts.some((c) => c.type === 'gpu'), r: 12000 },
+    { t: 'Арендуйте Машинный зал №1', ok: () => S.halls[2].open, r: 15000 },
+    { t: 'Держите 60 серверов', ok: () => countServers() >= 60, r: 30000 },
+    { t: 'Заработайте $25 000 чистыми за день', ok: () => S.stats.bestDay >= 25000, r: 50000 },
+    { t: 'Арендуйте Машинный зал №2', ok: () => S.halls[3].open, r: 80000 },
+    { t: 'Поднимите репутацию до ★★★★★', ok: () => repLevel() >= 5, r: 150000 },
+    { t: 'Откройте Северный ЦОД', ok: () => S.halls[4].open, r: 300000 },
+    { t: 'Постройте Гиперскейл-кампус', ok: () => S.halls[5].open, r: 1000000, win: true },
+    { t: 'Держите 500 серверов', ok: () => countServers() >= 500, r: 2000000 },
+  ];
+
+  // ================= STATE =================
   let S;
-  let refs = { units: [], rackHeat: [] };
-  let inspKey = '';
-  let eventKey = '';
-
-  // ---------- state ----------
   function newState() {
-    const racks = [0, 1, 2, 3].map((i) => ({ owned: i < 2, slots: Array(UNITS).fill(null), heat: 0, cool: 0 }));
-    racks[0].slots[0] = server();
-    racks[0].slots[1] = server();
-    racks[0].slots[2] = { kind: 'cooler', broken: false };
-    return {
-      racks, money: 400, earned: 0, rep: 100, day: 1, minute: 8 * 60,
-      speed: 1, paused: false, started: false, over: false,
-      demand: 0, served: 0, cap: 0, event: null, sel: null, log: [],
+    const halls = HALLS.map((h, i) => ({ open: i === 0, grid: Array(h.w * h.h).fill(null), dark: false, load: 0, cap: h.kw, backup: 0 }));
+    const g = halls[0].grid;
+    g[1 * 5 + 1] = mkRack(['b1', 'b1']);
+    g[1 * 5 + 2] = { k: 'crac' };
+    const st = {
+      v: 1, day: 1, hour: 8, money: 3000, rep: 10, speed: 1, paused: false, started: false, over: false, won: false,
+      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0 }, jobs: [],
+      contracts: [], offers: [], nextId: 1, event: null, nextEvent: 44, goal: 0,
+      stats: { signed: 0, done: 0, failed: 0, bestDay: 0 },
+      today: { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 }, history: [], hourly: [],
+      log: [], debtDays: 0, cur: 0, sel: null, tool: 'select', view: 'normal', tab: 'deals',
+      cap: { cpu: 0, sto: 0, gpu: 0 }, dem: { cpu: 0, sto: 0, gpu: 0 }, peak: { cpu: 0, sto: 0, gpu: 0 }, served: { cpu: 1, sto: 1, gpu: 1 },
     };
+    S = st;
+    S.offers.push(genOffer(true), genOffer(), genOffer());
+    return st;
   }
-  function server() { return { kind: 'server', level: 1, temp: 24, load: 0, status: 'ok', boot: 0, powered: true, on: false, spent: PRICE.server }; }
-  const capOf = (s) => CAP[s.level] * (s.status === 'disk' ? 0.5 : 1);
-  const nameOf = (ri, u) => `srv-${LETTERS[ri]}${u + 1}`;
-  const clock = () => `${String(Math.floor(S.minute / 60)).padStart(2, '0')}:${String(S.minute % 60).padStart(2, '0')}`;
-  const money = (v) => (v < 0 ? '−$' : '$') + Math.abs(Math.round(v)).toLocaleString('ru-RU');
+  function mkRack(s = []) { return { k: 'rack', s, broken: 0, fire: 0, temp: 24, heat: 0, cool: 0 }; }
+
+  const repLevel = () => clamp(1 + Math.floor(S.rep / 20), 1, 5);
+  const hasTech = (id) => !!S.tech[id];
+  function countServers() { let n = 0; S.halls.forEach((h) => h.grid.forEach((t) => { if (t && t.k === 'rack') n += t.s.length; })); return n; }
+  const fmt$ = (v) => {
+    const a = Math.abs(v);
+    const s = a >= 1e6 ? `${(a / 1e6).toFixed(2).replace('.', ',')} млн` : Math.round(a).toLocaleString('ru-RU');
+    return (v < 0 ? '−$' : '$') + s;
+  };
+  const fmtN = (v) => Math.round(v).toLocaleString('ru-RU');
+  const clock = () => `${String(S.hour).padStart(2, '0')}:00`;
+  const tileName = (h, i) => `${String.fromCharCode(65 + (i % HALLS[h].w))}${Math.floor(i / HALLS[h].w) + 1}`;
 
   function log(msg, lvl = '') {
     S.log.unshift({ t: `Д${S.day} ${clock()}`, msg, lvl });
-    S.log.length = Math.min(S.log.length, 40);
-    renderLog();
+    if (S.log.length > 60) S.log.length = 60;
+    logDirty = true;
+  }
+  let toastTimer;
+  function toast(msg, cls = '') {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.className = `toast ${cls}`;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
   }
 
-  // ---------- simulation ----------
-  function tick() {
-    const ev = S.event;
-    const hour = S.minute / 60;
-    const wave = 0.6 + 0.4 * Math.sin(((hour - 14) / 24) * 2 * Math.PI); // peak at 20:00
-    let demand = 16 * Math.pow(1.17, S.day - 1) * wave;
-    if (ev && ev.type === 'ddos') demand *= 2.2;
-    const ambient = 24 + (ev && ev.type === 'heat' ? 9 : 0);
-    const outage = !!(ev && ev.type === 'outage');
+  // ================= SOUND =================
+  const Sound = {
+    ctx: null, on: true,
+    init() { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; } } },
+    beep(f, d = 0.08, type = 'square', vol = 0.035, slide = 0, delay = 0) {
+      if (!this.on || !this.ctx) return;
+      const t = this.ctx.currentTime + delay;
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + d);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(this.ctx.destination); o.start(t); o.stop(t + d + 0.02);
+    },
+    click() { this.beep(1200, 0.025, 'square', 0.02); },
+    build() { this.beep(300, 0.06, 'square', 0.04); this.beep(450, 0.08, 'square', 0.04, 0, 0.06); },
+    coin() { this.beep(880, 0.06, 'square', 0.03); this.beep(1320, 0.1, 'square', 0.03, 0, 0.07); },
+    alarm() { this.beep(1040, 0.12, 'square', 0.035); this.beep(760, 0.12, 'square', 0.035, 0, 0.15); },
+    bad() { this.beep(330, 0.15, 'triangle', 0.06); this.beep(220, 0.25, 'triangle', 0.06, 0, 0.16); },
+    win() { [523, 659, 784, 1046].forEach((f, i) => this.beep(f, 0.18, 'square', 0.035, 0, i * 0.12)); },
+    crash() { this.beep(240, 0.45, 'sawtooth', 0.06, -190); },
+  };
 
-    let cap = 0;
-    let upkeep = 0;
-    S.racks.forEach((r, ri) => {
-      if (!r.owned) return;
-      let budget = outage ? r.slots.filter((s) => s && s.kind === 'ups').length * 4 : Infinity;
-      r.slots.forEach((s, u) => {
-        if (!s) return;
-        if (s.kind === 'cooler') { if (!s.broken) upkeep += 0.03; return; }
-        if (s.kind === 'ups') { upkeep += 0.01; return; }
-        s.on = false;
-        if (s.status === 'down') { s.powered = false; return; }
-        s.powered = budget > 0;
-        if (!s.powered) return;
-        budget--;
-        upkeep += 0.03 * s.level;
-        if (s.status === 'boot' && --s.boot <= 0) { s.status = 'ok'; log(`${nameOf(ri, u)} снова в строю`, 'good'); }
-        if (s.status === 'ok' || s.status === 'disk') { s.on = true; cap += capOf(s); }
-      });
+  // ================= CONTRACTS =================
+  function genOffer(small) {
+    const L = repLevel();
+    const kinds = Object.keys(KINDS).filter((k) => (!KINDS[k].req || hasTech(KINDS[k].req)));
+    const kind = pick(kinds);
+    const K = KINDS[kind];
+    let lvl = small ? 1 : clamp(L + pick([-1, 0, 0, 0, 1]), 1, 5);
+    if (K.lvl) lvl = Math.max(lvl, K.lvl);
+    const [a, b] = AMT[K.type][lvl - 1];
+    const amount = Math.round(rand(a, b));
+    const sla = K.sla || pick([95, 95, 99]);
+    const crypto = S.event && S.event.type === 'crypto' && K.type === 'gpu' ? 2 : 1;
+    const pay = amount * TYPES[K.type].rate * SLA_MULT[sla] * rand(0.85, 1.25) * (1 + 0.05 * S.staff.sales) * (hasTech('peering') ? 1.15 : 1) * crypto;
+    return {
+      id: S.nextId++, name: pick(CLIENTS[kind]), kind, type: K.type, amount, sla, lvl,
+      pay: Math.max(1, Math.round(pay * 10) / 10), days: small ? 3 : randi(3, 7) + lvl, expires: randi(30, 48),
+    };
+  }
+  function contractPeak(c) { return c.amount; }
+
+  // ================= SIMULATION =================
+  function rackCap(t, hallDark) {
+    const res = { cpu: 0, sto: 0, gpu: 0 };
+    if (hallDark || t.fire) return res;
+    const throttle = t.temp > 40 ? 0.6 : t.temp > 32 ? 0.85 : 1;
+    const working = t.s.length - t.broken;
+    for (let i = 0; i < working; i++) { const m = MODELS[t.s[i]]; res[m.type] += m.cap * throttle; }
+    return res;
+  }
+  function techMult(type) {
+    if (type === 'cpu') return (hasTech('virt') ? 1.2 : 1) * (hasTech('k8s') ? 1.25 : 1);
+    if (type === 'sto') return hasTech('k8s') ? 1.15 : 1;
+    return 1;
+  }
+  function hallStats(hi) {
+    const H = S.halls[hi], D = HALLS[hi];
+    let load = 0, cap = D.kw, backup = 0;
+    H.grid.forEach((t) => {
+      if (!t) return;
+      if (t.k === 'rack') t.s.forEach((m) => { load += MODELS[m].kw; });
+      else { const b = BUILD[t.k]; load += b.kw || 0; cap += b.power || 0; backup += b.backup || 0; }
+    });
+    return { load, cap, backup };
+  }
+
+  function tick() {
+    S.hour++;
+    if (S.hour >= 24) { S.hour = 0; newDay(); }
+    const ev = S.event;
+    const outage = ev && ev.type === 'outage';
+
+    // halls: power
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      const st = hallStats(hi);
+      H.load = st.load; H.cap = st.cap; H.backup = st.backup;
+      const wasDark = H.dark;
+      H.dark = !!outage && st.backup < st.load;
+      if (H.dark && !wasDark) log(`${HALLS[hi].name}: резерва не хватило, зал обесточен`, 'crit');
     });
 
-    const served = Math.min(demand, cap);
-    const util = cap ? served / cap : 0;
+    // capacity
+    const cap = { cpu: 0, sto: 0, gpu: 0 };
+    S.halls.forEach((H) => {
+      if (!H.open) return;
+      H.grid.forEach((t) => { if (t && t.k === 'rack') { const c = rackCap(t, H.dark); cap.cpu += c.cpu; cap.sto += c.sto; cap.gpu += c.gpu; } });
+    });
+    for (const k in cap) cap[k] *= techMult(k);
 
-    S.racks.forEach((r, ri) => {
-      if (!r.owned) return;
-      let heat = 0, cool = 0;
-      r.slots.forEach((s) => {
-        if (!s) return;
-        if (s.kind === 'server') { s.load = s.on ? util : 0; if (s.on) heat += HEAT[s.level] * s.load + 2; }
-        if (s.kind === 'cooler' && !s.broken) cool += COOL;
+    // demand
+    const dem = { cpu: 0, sto: 0, gpu: 0 }, peak = { cpu: 0, sto: 0, gpu: 0 };
+    S.contracts.forEach((c) => { dem[c.type] += c.amount * PROF[KINDS[c.kind].prof](S.hour); peak[c.type] += c.amount; });
+    if (ev && ev.type === 'ddos') {
+      const shield = hasTech('antiddos') ? 0.15 : 1 - Math.min(0.6, S.staff.guard * 0.15);
+      dem.cpu *= 1 + 0.6 * shield;
+    }
+    const served = {}, util = {};
+    for (const k in dem) {
+      served[k] = dem[k] > 0 ? Math.min(1, cap[k] / dem[k]) : 1;
+      if (ev && ev.type === 'fiber') served[k] *= 0.4;
+      util[k] = cap[k] > 0 ? Math.min(1, dem[k] / cap[k]) : 0;
+    }
+    S.cap = cap; S.dem = dem; S.peak = peak; S.served = served;
+
+    // thermal
+    const heatwave = ev && ev.type === 'heat' ? 8 : 0;
+    const engMult = 1 + 0.08 * S.staff.eng;
+    const fail = 0.002 * (hasTech('aiops') ? 0.4 : 1);
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      const D = HALLS[hi];
+      const amb = D.amb + (D.amb >= 15 ? heatwave : 0);
+      const racks = [];
+      H.grid.forEach((t, i) => { if (t && t.k === 'rack') { t.cool = 0; racks.push(i); } });
+      if (!H.dark) {
+        H.grid.forEach((t, i) => {
+          if (!t || !BUILD[t.k].cool) return;
+          const b = BUILD[t.k];
+          const x = i % D.w, y = Math.floor(i / D.w);
+          const inRange = racks.filter((j) => Math.max(Math.abs((j % D.w) - x), Math.abs(Math.floor(j / D.w) - y)) <= b.r);
+          inRange.forEach((j) => { H.grid[j].cool += (b.cool * engMult) / inRange.length; });
+        });
+      }
+      racks.forEach((i) => {
+        const t = H.grid[i];
+        let heat = 0;
+        if (!H.dark) {
+          const working = t.s.length - t.broken;
+          for (let n = 0; n < working; n++) {
+            const m = MODELS[t.s[n]];
+            heat += m.heat * (0.3 + 0.7 * util[m.type]) * (m.type === 'gpu' && hasTech('liquid') ? 0.5 : 1);
+          }
+        }
+        if (t.fire) heat += 30;
+        t.heat = heat;
+        const target = amb + heat * 0.12 + Math.max(0, heat - t.cool) * 1.2;
+        t.temp += (target - t.temp) * 0.5;
+        if (H.dark || t.fire) return;
+        // failures
+        const p = fail * (t.temp > 32 ? 2.5 : 1) * (t.temp > 40 ? 4 : 1);
+        const working = t.s.length - t.broken;
+        for (let n = 0; n < working; n++) if (Math.random() < p) t.broken++;
+        if (t.broken > 0 && t.broken > (t.lastBroken || 0)) log(`Сломался сервер в ${HALLS[hi].name}, стойка ${tileName(hi, i)}`, 'warn');
+        t.lastBroken = t.broken;
+        if (t.temp > 44 && t.s.length && Math.random() < 0.04) {
+          t.fire = 5; t.fireAge = 0;
+          log(`ПОЖАР! ${HALLS[hi].name}, стойка ${tileName(hi, i)}. Кликните, чтобы потушить`, 'crit');
+          Sound.alarm();
+          if (S.cur !== hi) toast(`Пожар: ${HALLS[hi].name}, ${tileName(hi, i)}`, 'bad');
+        }
       });
-      r.heat = heat; r.cool = cool;
-      const excess = Math.max(0, heat - cool);
-      r.slots.forEach((s, u) => {
-        if (!s || s.kind !== 'server') return;
-        const target = s.on ? ambient + s.load * 28 + excess * 1.1 : ambient - 2 + excess * 0.3;
-        s.temp += (target - s.temp) * 0.22;
-        if (s.on && s.temp >= 92 && Math.random() < 0.3) {
-          s.status = 'down'; s.on = false;
-          log(`${nameOf(ri, u)} перегрелся и упал (${Math.round(s.temp)} °C)`, 'crit');
-        } else if (s.on && s.status === 'ok' && Math.random() < 0.0012) {
-          s.status = 'disk';
-          log(`${nameOf(ri, u)}: сбой диска, RAID деградировал`, 'warn');
+      // fires
+      racks.forEach((i) => {
+        const t = H.grid[i];
+        if (!t.fire) return;
+        t.fireAge++;
+        if (S.staff.guard > 0 && t.fireAge >= 1) { t.fire = 0; log(`Безопасник потушил стойку ${tileName(hi, i)}`, 'good'); return; }
+        if (--t.fire <= 0) {
+          const lost = t.s.length;
+          t.s = []; t.broken = 0; t.lastBroken = 0; t.fire = 0; t.temp = amb + 20;
+          log(`Стойка ${tileName(hi, i)} сгорела: потеряно серверов ${lost}`, 'crit');
+          Sound.crash();
         }
       });
     });
 
-    const income = served * 0.12;
-    S.money += income - upkeep;
-    S.earned += income;
-    S.demand = demand; S.served = served; S.cap = cap;
+    // money: contracts
+    let income = 0;
+    const finished = [];
+    S.contracts.forEach((c) => {
+      const f = served[c.type];
+      income += c.pay * f;
+      c.ok += f; c.hrs++; c.left--;
+      if (c.left <= 0) finished.push(c);
+    });
+    finished.forEach((c) => {
+      S.contracts = S.contracts.filter((x) => x !== c);
+      const up = (c.ok / c.hrs) * 100;
+      if (up >= c.sla - 0.001) {
+        const bonus = Math.round(c.pay * 8);
+        S.money += bonus; S.today.inc += bonus;
+        S.rep = Math.min(100, S.rep + 2 + c.lvl * 1.5);
+        S.stats.done++;
+        log(`Контракт «${c.name}» выполнен (${up.toFixed(2)}%). Бонус ${fmt$(bonus)}`, 'good');
+        Sound.coin();
+      } else {
+        const fine = Math.round(c.pay * 12);
+        S.money -= fine; S.today.other += fine;
+        S.rep = Math.max(0, S.rep - 4 - c.lvl * 2);
+        S.stats.failed++;
+        log(`SLA нарушен: «${c.name}» (${up.toFixed(2)}% < ${c.sla}%). Штраф ${fmt$(fine)}`, 'crit');
+        Sound.bad();
+      }
+    });
+    // expenses: electricity
+    let kw = 0;
+    S.halls.forEach((H) => { if (H.open && !H.dark) kw += H.load; });
+    const elec = kw * 0.4 * (hasTech('solar') ? 0.65 : 1);
+    S.money += income - elec;
+    S.today.inc += income; S.today.elec += elec;
+    S.hourly.push(income - elec);
+    if (S.hourly.length > 24) S.hourly.shift();
 
-    const miss = demand > 0 ? 1 - served / demand : 0;
-    if (miss > 0.02) S.rep -= miss * 1.5;
-    else S.rep = Math.min(100, S.rep + 0.08);
+    // reputation drift
+    let allGood = true;
+    for (const k in dem) if (dem[k] > 0 && served[k] < 0.98) { S.rep = Math.max(0, S.rep - (1 - served[k]) * 0.6); allGood = false; }
+    if (allGood && S.contracts.length) S.rep = Math.min(100, S.rep + 0.02);
 
-    if (ev && --ev.left <= 0) endEvent();
-    if (!S.event && S.day >= 2 && Math.random() < 0.006) startEvent();
+    // offers
+    S.offers.forEach((o) => o.expires--);
+    S.offers = S.offers.filter((o) => o.expires > 0);
+    const want = 3 + S.staff.sales;
+    if (S.offers.length < want && Math.random() < 0.25) S.offers.push(genOffer());
 
-    S.minute += TICK_MIN;
-    if (S.minute >= 1440) {
-      S.minute -= 1440; S.day++;
-      log(`Начался день ${S.day}. Пиковый трафик вырос на 17%`);
+    // research
+    if (S.research) {
+      S.research.left--;
+      if (S.research.left <= 0) {
+        const t = TECH.find((x) => x.id === S.research.id);
+        S.tech[t.id] = true; S.research = null;
+        log(`Исследование завершено: ${t.name}`, 'good');
+        toast(`Изучено: ${t.name}`, 'good');
+        Sound.win();
+      }
     }
 
-    if (S.rep <= 0) { S.rep = 0; gameOver(); }
+    // staff jobs
+    runJobs();
+
+    // events
+    if (ev) {
+      ev.left--;
+      if (ev.left <= 0) { log(`Закончилось: ${EVENTS[ev.type].name}`, 'good'); S.event = null; }
+    } else if (--S.nextEvent <= 0) {
+      const types = Object.keys(EVENTS).filter((k) => !EVENTS[k].skip || !hasTech(EVENTS[k].skip));
+      const type = pick(types);
+      const E = EVENTS[type];
+      S.event = { type, left: randi(E.h[0], E.h[1]) };
+      log(`${E.name}! ${E.desc}`, type === 'crypto' ? 'good' : 'crit');
+      if (type !== 'crypto') Sound.alarm();
+      S.nextEvent = randi(36, 84);
+    }
+
+    checkGoals();
   }
 
-  function startEvent() {
-    const pool = ['ddos', 'outage', 'heat', 'ac'];
-    const type = pool[Math.floor(Math.random() * pool.length)];
-    if (type === 'ac') {
-      const coolers = [];
-      S.racks.forEach((r, ri) => r.owned && r.slots.forEach((s, u) => { if (s && s.kind === 'cooler' && !s.broken) coolers.push([s, ri, u]); }));
-      if (!coolers.length) return;
-      const [c, ri, u] = coolers[Math.floor(Math.random() * coolers.length)];
-      c.broken = true;
-      log(`Сломался кондиционер в стойке ${LETTERS[ri]} (U${u + 1})`, 'crit');
-      return;
-    }
-    const left = { ddos: 30, outage: 15, heat: 40 }[type];
-    S.event = { type, left };
-    const msg = {
-      ddos: 'DDoS-атака! Трафик вырос в 2,2 раза',
-      outage: 'Отключение питания в здании. Работают только серверы под ИБП',
-      heat: 'Жара на улице: в машинном зале +9 °C',
-    }[type];
-    log(msg, 'crit');
+  function runJobs() {
+    // drop stale jobs
+    S.jobs = S.jobs.filter((j) => {
+      const t = S.halls[j.h].grid[j.i];
+      return t && t.k === 'rack' && (j.kind === 'fire' ? t.fire > 0 : t.broken > 0);
+    });
+    // progress
+    S.jobs.forEach((j) => {
+      j.t++;
+      if (j.t >= j.travel + j.work) {
+        const t = S.halls[j.h].grid[j.i];
+        if (j.kind === 'fire') { t.fire = 0; log(`Админ потушил стойку ${tileName(j.h, j.i)}`, 'good'); }
+        else { log(`Админ починил ${t.broken} серв. в стойке ${tileName(j.h, j.i)}`, 'good'); t.broken = 0; t.lastBroken = 0; }
+        j.done = true;
+      }
+    });
+    S.jobs = S.jobs.filter((j) => !j.done);
+    // assign
+    let idle = S.staff.admin - S.jobs.length;
+    if (idle <= 0) return;
+    const todo = [];
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      H.grid.forEach((t, i) => {
+        if (!t || t.k !== 'rack') return;
+        if (S.jobs.some((j) => j.h === hi && j.i === i)) return;
+        if (t.fire) todo.unshift({ h: hi, i, kind: 'fire' });
+        else if (t.broken) todo.push({ h: hi, i, kind: 'repair' });
+      });
+    });
+    todo.slice(0, idle).forEach((j) => {
+      const D = HALLS[j.h];
+      const dist = (j.i % D.w) + Math.abs(Math.floor(j.i / D.w) - D.h / 2);
+      j.travel = Math.max(1, Math.ceil(dist / 4));
+      j.work = j.kind === 'fire' ? 1 : hasTech('aiops') ? 1 : 2;
+      j.t = 0;
+      S.jobs.push(j);
+    });
   }
-  function endEvent() {
-    const msg = { ddos: 'Атака закончилась', outage: 'Питание восстановлено', heat: 'Жара спала' }[S.event.type];
-    S.event = null;
-    log(msg, 'good');
+
+  function newDay() {
+    S.day++;
+    const sal = Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0);
+    const rent = HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0);
+    S.money -= sal + rent;
+    S.today.sal += sal; S.today.rent += rent;
+    const d = S.today;
+    const net = d.inc - d.elec - d.sal - d.rent - d.other;
+    S.history.push({ inc: Math.round(d.inc), exp: Math.round(d.elec + d.sal + d.rent + d.other), net: Math.round(net) });
+    if (S.history.length > 30) S.history.shift();
+    S.stats.bestDay = Math.max(S.stats.bestDay, net);
+    S.today = { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 };
+    log(`День ${S.day}. Вчера: ${net >= 0 ? 'прибыль' : 'убыток'} ${fmt$(net)}`, net >= 0 ? '' : 'warn');
+    if (S.money < 0) {
+      S.debtDays++;
+      if (S.debtDays >= 3) { gameOver(); return; }
+      toast(`Счёт в минусе уже ${S.debtDays} дн. На 3-й день — банкротство`, 'bad');
+      Sound.bad();
+    } else S.debtDays = 0;
+    save();
+  }
+
+  function checkGoals() {
+    while (S.goal < GOALS.length && GOALS[S.goal].ok()) {
+      const g = GOALS[S.goal];
+      S.money += g.r; S.today.other -= g.r;
+      log(`Цель выполнена: ${g.t}. Награда ${fmt$(g.r)}`, 'good');
+      toast(`Цель выполнена! +${fmt$(g.r)}`, 'good');
+      Sound.win();
+      S.goal++;
+      if (g.win && !S.won) { S.won = true; showOverlay('win'); }
+    }
   }
 
   function gameOver() {
     S.over = true;
-    let best = 0;
-    try { best = Number(localStorage.getItem(BEST_KEY)) || 0; } catch (e) {}
-    const result = S.day - 1 + S.minute / 1440;
-    const isBest = result > best;
-    if (isBest) { try { localStorage.setItem(BEST_KEY, String(result)); } catch (e) {} best = result; }
-    showOverlay('over', { result, best, isBest });
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    Sound.crash();
+    showOverlay('over');
   }
 
-  // ---------- actions ----------
-  function spend(amount) {
-    if (S.money < amount) return false;
-    S.money -= amount;
+  // ================= ACTIONS =================
+  function spend(v) {
+    if (S.money < v) { toast(`Не хватает денег: нужно ${fmt$(v)}`, 'bad'); Sound.bad(); return false; }
+    S.money -= v; S.today.other += v;
     return true;
   }
-  function act(action, arg) {
-    const sel = S.sel;
-    const r = sel && S.racks[sel.r];
-    const s = sel && r.slots[sel.u];
-    switch (action) {
-      case 'buy': {
-        if (!spend(PRICE[arg])) return;
-        r.slots[sel.u] = arg === 'server' ? server() : arg === 'cooler' ? { kind: 'cooler', broken: false } : { kind: 'ups' };
-        const label = { server: 'Сервер', cooler: 'Кондиционер', ups: 'ИБП' }[arg];
-        log(`${label} установлен в ${LETTERS[sel.r]}/U${sel.u + 1}`);
-        buildRacks();
-        break;
-      }
-      case 'upgrade': {
-        const cost = PRICE.up[s.level + 1];
-        if (!spend(cost)) return;
-        s.level++; s.spent += cost;
-        log(`${nameOf(sel.r, sel.u)} проапгрейжен до L${s.level}`);
-        buildRacks();
-        break;
-      }
-      case 'reboot':
-        s.status = 'boot'; s.boot = 6;
-        log(`${nameOf(sel.r, sel.u)} перезагружается`);
-        break;
-      case 'disk':
-        if (!spend(PRICE.disk)) return;
-        s.status = 'ok';
-        log(`${nameOf(sel.r, sel.u)}: диск заменён`, 'good');
-        break;
-      case 'fix':
-        if (!spend(PRICE.fix)) return;
-        s.broken = false;
-        log(`Кондиционер в ${LETTERS[sel.r]}/U${sel.u + 1} починен`, 'good');
-        break;
-      case 'sell': {
-        const back = s.kind === 'server' ? s.spent / 2 : s.kind === 'cooler' ? PRICE.cooler / 2 : PRICE.ups / 2;
-        S.money += back;
-        r.slots[sel.u] = null;
-        log(`Оборудование из ${LETTERS[sel.r]}/U${sel.u + 1} продано за ${money(back)}`);
-        buildRacks();
-        break;
-      }
-      case 'rack': {
-        const owned = S.racks.filter((x) => x.owned).length;
-        if (!spend(PRICE.rack[owned])) return;
-        S.racks[arg].owned = true;
-        log(`Арендована стойка ${LETTERS[arg]}`);
-        buildRacks();
-        break;
-      }
-      case 'filter':
-        if (!S.event || S.event.type !== 'ddos' || !spend(PRICE.filter)) return;
-        log('Фильтрация трафика включена, атака отбита', 'good');
-        S.event = null;
-        break;
-      case 'close':
-        S.sel = null;
-        break;
+  function selTile() { return S.sel ? S.halls[S.sel.h].grid[S.sel.i] : null; }
+
+  function place(kind, h, i) {
+    const H = S.halls[h];
+    if (H.grid[i]) return false;
+    const b = BUILD[kind];
+    if (b.req && !hasTech(b.req)) { toast('Сначала изучите технологию', 'bad'); return false; }
+    const st = hallStats(h);
+    if (b.kw && st.load + b.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return false; }
+    if (!spend(b.price)) return false;
+    H.grid[i] = kind === 'rack' ? mkRack() : { k: kind };
+    Sound.build();
+    refreshHall(h);
+    return true;
+  }
+  function refreshHall(h) { const st = hallStats(h); Object.assign(S.halls[h], { load: st.load, cap: st.cap, backup: st.backup }); }
+
+  function refund(t) {
+    if (t.k === 'rack') return BUILD.rack.price * 0.5 + t.s.reduce((a, m) => a + MODELS[m].price * 0.5, 0);
+    return BUILD[t.k].price * 0.5;
+  }
+
+  const ACT = {
+    pause() { S.paused = !S.paused; },
+    speed(a) { S.speed = Number(a); S.paused = false; },
+    sound() { Sound.init(); Sound.on = !Sound.on; },
+    menu() { S.paused = true; showOverlay('menu'); },
+    resume() { $('#overlay').hidden = true; S.paused = false; },
+    save() { save(); toast('Игра сохранена', 'good'); },
+    reset() { showOverlay('confirm'); },
+    newgame() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} newState(); S.started = true; $('#overlay').hidden = true; afterLoad(); log('Вы открыли свою первую серверную в каморке под лестницей'); },
+    cont() { S.started = true; S.paused = false; $('#overlay').hidden = true; },
+    keep() { $('#overlay').hidden = true; S.paused = false; },
+    tool(a) { S.tool = S.tool === a ? 'select' : a; },
+    view(a) { S.view = a; },
+    tab(a) { S.tab = a; },
+    hall(a) { S.cur = Number(a); S.sel = null; layoutCanvas(); },
+    openhall(a) {
+      const i = Number(a), D = HALLS[i];
+      if (repLevel() < D.lvl) { toast(`Нужна репутация ${'★'.repeat(D.lvl)}`, 'bad'); return; }
+      if (!spend(D.price)) return;
+      S.halls[i].open = true;
+      log(`Арендован зал: ${D.name}`, 'good');
+      Sound.win();
+      refreshHall(i);
+    },
+    build(a) { if (S.sel) place(a, S.sel.h, S.sel.i); },
+    addsrv(a) {
+      const t = selTile(); const m = MODELS[a];
+      if (!t || t.k !== 'rack' || t.s.length >= RACK_SLOTS) return;
+      const st = hallStats(S.sel.h);
+      if (st.load + m.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return; }
+      if (!spend(m.price)) return;
+      t.s.splice(t.s.length - t.broken, 0, a);
+      Sound.build();
+      refreshHall(S.sel.h);
+    },
+    sellsrv(a) {
+      const t = selTile(); const n = Number(a);
+      if (!t || !t.s[n]) return;
+      const isBroken = n >= t.s.length - t.broken;
+      const back = MODELS[t.s[n]].price * (isBroken ? 0.1 : 0.5);
+      t.s.splice(n, 1);
+      if (isBroken) t.broken--;
+      S.money += back;
+      refreshHall(S.sel.h);
+    },
+    repair() {
+      const t = selTile();
+      if (!t || !t.broken) return;
+      const cost = t.s.slice(t.s.length - t.broken).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
+      if (!spend(cost)) return;
+      t.broken = 0; t.lastBroken = 0;
+      Sound.coin();
+      log(`Стойка ${tileName(S.sel.h, S.sel.i)} починена вручную`, 'good');
+    },
+    extinguish() { const t = selTile(); if (t && t.fire) { t.fire = 0; Sound.coin(); log('Пожар потушен вручную', 'good'); } },
+    demolish() {
+      const t = selTile(); if (!t) return;
+      const back = refund(t);
+      S.money += back;
+      S.halls[S.sel.h].grid[S.sel.i] = null;
+      refreshHall(S.sel.h);
+      toast(`Демонтировано, возврат ${fmt$(back)}`);
+    },
+    sign(a) {
+      const o = S.offers.find((x) => x.id === Number(a)); if (!o) return;
+      if (repLevel() < o.lvl) { toast(`Клиенту нужна репутация ${'★'.repeat(o.lvl)}`, 'bad'); return; }
+      S.offers = S.offers.filter((x) => x !== o);
+      S.contracts.push({ ...o, left: o.days * 24, ok: 0, hrs: 0 });
+      S.stats.signed++;
+      log(`Подписан контракт: «${o.name}», ${fmtN(o.amount)} ${TYPES[o.type].unit}`, 'good');
+      Sound.coin();
+    },
+    cancel(a) {
+      const c = S.contracts.find((x) => x.id === Number(a)); if (!c) return;
+      const fine = Math.round(c.pay * 24);
+      S.money -= fine; S.today.other += fine;
+      S.rep = Math.max(0, S.rep - 3);
+      S.contracts = S.contracts.filter((x) => x !== c);
+      log(`Контракт «${c.name}» расторгнут. Неустойка ${fmt$(fine)}`, 'warn');
+    },
+    reject(a) { S.offers = S.offers.filter((x) => x.id !== Number(a)); },
+    hire(a) {
+      const R = STAFF[a];
+      if (R.max && S.staff[a] >= R.max) return;
+      if (S.money < R.pay) { toast('Нужно хотя бы на первую зарплату', 'bad'); return; }
+      S.staff[a]++;
+      Sound.click();
+      log(`Нанят: ${R.name}`);
+    },
+    fireStaff(a) { if (S.staff[a] > 0) { S.staff[a]--; log(`Уволен: ${STAFF[a].name}`); } },
+    research(a) {
+      if (S.research) return;
+      const t = TECH.find((x) => x.id === a);
+      if (!spend(t.price)) return;
+      S.research = { id: t.id, left: Math.round(t.days * 24), total: Math.round(t.days * 24) };
+      log(`Начато исследование: ${t.name}`);
+    },
+  };
+
+  // ================= RENDER: UI =================
+  let logDirty = true;
+  let pressing = false;
+  const last = {};
+  function setHTML(id, html) { if (last[id] !== html) { $(id).innerHTML = html; last[id] = html; } }
+
+  function renderUI() {
+    const m = $('#rMoney');
+    m.textContent = fmt$(S.money);
+    m.className = `v ${S.money < 0 ? 'neg' : ''}`;
+    const p24 = S.hourly.reduce((a, b) => a + b, 0);
+    const pr = $('#rProfit');
+    pr.textContent = `${p24 >= 0 ? '+' : ''}${fmt$(p24)}`;
+    pr.className = `v ${p24 >= 0 ? 'pos' : 'neg'}`;
+    const L = repLevel();
+    $('#rRep').innerHTML = `${'★'.repeat(L)}<i>${'★'.repeat(5 - L)}</i> <small class="meta">${Math.round(S.rep)}</small>`;
+    $('#rDate').textContent = `День ${S.day}, ${clock()}`;
+    for (const k of ['cpu', 'sto', 'gpu']) {
+      const el = $(`#r${k[0].toUpperCase()}${k.slice(1)}`);
+      el.textContent = `${fmtN(S.dem[k])} / ${fmtN(S.cap[k])}`;
+      el.className = `v ${S.dem[k] > 0 && S.served[k] < 0.98 ? 'neg' : ''}`;
     }
-    render();
-  }
+    $('#bPause').setAttribute('aria-pressed', String(S.paused));
+    document.querySelectorAll('[data-act="speed"]').forEach((b) => b.setAttribute('aria-pressed', String(!S.paused && Number(b.dataset.a) === S.speed)));
+    $('#bSound').textContent = Sound.on ? 'Звук: вкл' : 'Звук: выкл';
 
-  // ---------- rendering ----------
-  function buildRacks() {
-    const root = $('#racks');
-    root.textContent = '';
-    refs = { units: [], rackHeat: [] };
-    const owned = S.racks.filter((x) => x.owned).length;
-    S.racks.forEach((r, ri) => {
-      const rack = document.createElement('div');
-      rack.className = 'rack';
-      const rail = Array.from({ length: UNITS }, (_, u) => `<span>${u + 1}</span>`).join('');
-      rack.innerHTML = `<div class="rack-head"><b>Стойка ${LETTERS[ri]}</b><span></span></div>
-        <div class="rack-body"><div class="rail" aria-hidden="true">${rail}</div><div class="units"></div></div>`;
-      refs.rackHeat[ri] = rack.querySelector('.rack-head span');
-      const list = rack.querySelector('.units');
-      refs.units[ri] = r.slots.map((s, u) => {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.dataset.r = ri; el.dataset.u = u;
-        if (!s) {
-          el.className = 'unit empty';
-          el.innerHTML = `<span class="name">свободно</span><span class="meta">+</span>`;
-          el.setAttribute('aria-label', `Стойка ${LETTERS[ri]}, юнит ${u + 1}: свободно`);
-        } else if (s.kind === 'server') {
-          el.className = 'unit';
-          el.innerHTML = `<span class="leds"><i class="led pwr"></i><i class="led act"></i></span><span class="name">${nameOf(ri, u)}<b>L${s.level}</b></span><span class="meta"></span><span class="bar"><i></i></span>`;
-          el.setAttribute('aria-label', `${nameOf(ri, u)}, уровень ${s.level}`);
-        } else if (s.kind === 'cooler') {
-          el.className = 'unit';
-          el.innerHTML = `<span class="fan"></span><span class="name">охлаждение</span><span class="meta">−${COOL}</span>`;
-          el.setAttribute('aria-label', `Кондиционер, стойка ${LETTERS[ri]}`);
-        } else {
-          el.className = 'unit';
-          el.innerHTML = `<span class="batt"><i></i></span><span class="name">ИБП</span><span class="meta">×4</span>`;
-          el.setAttribute('aria-label', `ИБП, стойка ${LETTERS[ri]}`);
-        }
-        list.append(el);
-        return { el, meta: el.querySelector('.meta'), bar: el.querySelector('.bar i') };
-      });
-      if (!r.owned) {
-        const lock = document.createElement('div');
-        lock.className = 'locked';
-        const price = PRICE.rack[owned];
-        lock.innerHTML = `<p>Стойка не арендована</p><button class="btn primary" type="button" data-act="rack" data-arg="${ri}">Арендовать · ${money(price)}</button>`;
-        rack.append(lock);
-      }
-      root.append(rack);
-    });
-    inspKey = '';
-  }
+    const g = GOALS[S.goal];
+    setHTML('#goal', g ? `<b>Цель ${S.goal + 1}/${GOALS.length}</b><span>${g.t}</span><em>+${fmt$(g.r)}</em>` : `<b>Все цели</b><span>Вы построили империю дата-центров. Можно продолжать расти.</span>`);
 
-  function render() {
-    $('#sDay').textContent = S.day;
-    $('#sTime').textContent = clock();
-    const m = $('#sMoney');
-    m.textContent = money(S.money);
-    m.classList.toggle('neg', S.money < 0);
-    $('#sLoad').textContent = `${S.served.toFixed(0)} / ${S.demand.toFixed(0)}`;
-    const ratio = S.demand ? S.served / S.demand : 1;
-    const ml = $('#mLoad');
-    ml.style.width = `${S.cap ? Math.min(100, (S.demand / S.cap) * 100) : 100}%`;
-    ml.style.backgroundColor = ratio < 0.98 ? 'var(--crit)' : S.demand / Math.max(S.cap, 1) > 0.85 ? 'var(--warn)' : 'var(--ok)';
-    $('#sRep').textContent = `${Math.round(S.rep)}%`;
-    const mr = $('#mRep');
-    mr.style.width = `${S.rep}%`;
-    mr.style.backgroundColor = S.rep < 30 ? 'var(--crit)' : S.rep < 60 ? 'var(--warn)' : 'var(--ok)';
-
-    const outage = S.event && S.event.type === 'outage';
-    S.racks.forEach((r, ri) => {
-      const h = refs.rackHeat[ri];
-      if (r.owned) {
-        h.textContent = `тепло ${Math.round(r.heat)}/${r.cool}`;
-        h.classList.toggle('over', r.heat > r.cool);
-      } else h.textContent = '';
-      r.slots.forEach((s, u) => {
-        const ref = refs.units[ri][u];
-        ref.el.classList.toggle('sel', !!S.sel && S.sel.r === ri && S.sel.u === u);
-        if (!s) return;
-        if (s.kind === 'server') {
-          const st = s.status !== 'down' && !s.powered ? 'off' : s.status;
-          ref.el.dataset.st = st;
-          ref.meta.textContent = `${Math.round(s.temp)}°`;
-          ref.el.dataset.heat = s.temp >= 85 ? 'hot' : s.temp >= 72 ? 'warm' : '';
-          ref.bar.style.width = `${s.load * 100}%`;
-          ref.el.classList.toggle('busy', s.on && s.load > 0.03);
-          ref.el.style.setProperty('--blink', `${(0.9 - s.load * 0.7).toFixed(2)}s`);
-        } else if (s.kind === 'cooler') {
-          ref.el.dataset.st = s.broken ? 'broken' : 'ok';
-          ref.meta.textContent = s.broken ? 'сбой' : `−${COOL}`;
-        } else {
-          ref.el.dataset.st = outage ? 'drain' : 'ok';
-        }
-      });
-    });
-
-    renderEvent();
-    renderInspector();
-    renderPause();
-  }
-
-  function renderEvent() {
-    const box = $('#event');
     const ev = S.event;
-    if (!ev) { box.hidden = true; eventKey = ''; return; }
-    const key = `${ev.type}|${S.money >= PRICE.filter}`;
-    const mins = ev.left * TICK_MIN;
-    const left = `осталось ${Math.floor(mins / 60)} ч ${String(mins % 60).padStart(2, '0')} мин`;
-    if (key !== eventKey) {
-      eventKey = key;
-      const info = {
-        ddos: ['DDoS-атака', 'Трафик ×2,2. Нужен запас мощности или фильтр.'],
-        outage: ['Нет питания', 'Каждый ИБП держит 4 сервера своей стойки. Остальные обесточены.'],
-        heat: ['Жара', 'Кондиционеры не справляются: +9 °C во всех стойках.'],
-      }[ev.type];
-      box.className = `event${ev.type === 'heat' ? '' : ' crit'}`;
-      box.innerHTML = `<div class="what"><strong>${info[0]}</strong><span>${info[1]}</span></div><span class="left"></span>` +
-        (ev.type === 'ddos' ? `<button class="btn primary" type="button" data-act="filter" ${S.money < PRICE.filter ? 'disabled' : ''}>Включить фильтр · ${money(PRICE.filter)}</button>` : '');
+    const evBox = $('#event');
+    if (ev) {
+      const E = EVENTS[ev.type];
+      evBox.hidden = false;
+      evBox.className = `event ${E.cls}`;
+      setHTML('#event', `<strong>${E.name}</strong><span>${E.desc}</span><b class="left">ещё ${ev.left} ч</b>`);
+    } else evBox.hidden = true;
+
+    // halls nav
+    setHTML('#halls', HALLS.map((D, i) => {
+      const H = S.halls[i];
+      let sub;
+      if (!H.open) sub = `${fmt$(D.price)} · ${'★'.repeat(D.lvl)}`;
+      else {
+        const alarm = H.grid.some((t) => t && t.k === 'rack' && (t.fire || t.temp > 40)) || H.dark;
+        sub = alarm ? 'тревога' : `${H.grid.filter((t) => t && t.k === 'rack').length} стоек`;
+      }
+      const alarm = H.open && sub === 'тревога';
+      return `<button type="button" data-act="hall" data-a="${i}" aria-pressed="${S.cur === i}" class="${H.open ? '' : 'locked'} ${alarm ? 'alarm' : ''}">${D.name}<small>${sub}</small></button>`;
+    }).join(''));
+
+    const H = S.halls[S.cur], D = HALLS[S.cur];
+    if (H.open) {
+      refreshHall(S.cur);
+      setHTML('#hallinfo', `<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>${H.dark ? '<span class="over"><b class="over">ЗАЛ ОБЕСТОЧЕН</b></span>' : ''}`);
+    } else setHTML('#hallinfo', `<span>Зал ${D.w}×${D.h} клеток · ${D.kw} кВт · воздух ${D.amb} °C · аренда ${fmt$(D.rent)}/день</span>`);
+    const lock = $('#lockcard');
+    if (!H.open) {
+      lock.hidden = false;
+      const can = repLevel() >= D.lvl;
+      setHTML('#lockcard', `<h3>${D.name}</h3><p>${D.w}×${D.h} клеток, ${D.kw} кВт, воздух ${D.amb} °C</p><p>Требуется репутация ${'★'.repeat(D.lvl)}${can ? '' : ' (пока не хватает)'}</p><div><button class="btn primary" type="button" data-act="openhall" data-a="${S.cur}" ${can && S.money >= D.price ? '' : 'disabled'}>Арендовать за ${fmt$(D.price)}</button></div>`);
+    } else lock.hidden = true;
+
+    // tools
+    const tools = [['select', 'Выбор', 'осмотр'], ...Object.keys(BUILD).map((k) => [k, BUILD[k].name, `${fmt$(BUILD[k].price)} · ${BUILD[k].short}`, BUILD[k].req]), ['demolish', 'Снести', 'возврат 50%']];
+    setHTML('#tools', tools.map(([k, n, s, req]) => `<button class="btn" type="button" data-act="tool" data-a="${k}" aria-pressed="${S.tool === k}" ${req && !hasTech(req) ? 'disabled title="Нужно исследование"' : ''}>${n}<small>${s}</small></button>`).join('') +
+      `<span class="sep"></span><div class="seg" role="group" aria-label="Слой">${[['normal', 'План'], ['heat', 'Тепло'], ['power', 'Питание']].map(([k, n]) => `<button type="button" data-act="view" data-a="${k}" aria-pressed="${S.view === k}">${n}</button>`).join('')}</div>`);
+
+    // tabs
+    const tabs = [['obj', 'Объект'], ['deals', `Контракты<sup>${S.offers.length}</sup>`], ['staff', 'Персонал'], ['tech', 'Наука'], ['fin', 'Финансы'], ['goals', 'Цели']];
+    setHTML('#tabs', tabs.map(([k, n]) => `<button type="button" data-act="tab" data-a="${k}" aria-pressed="${S.tab === k}">${n}</button>`).join(''));
+    if (!pressing) setHTML('#tab', TAB[S.tab]());
+
+    if (logDirty) { $('#log').innerHTML = S.log.map((e) => `<li class="${e.lvl}"><time>${e.t}</time><span>${e.msg}</span></li>`).join(''); logDirty = false; }
+  }
+
+  const typeTag = (t) => `<span class="tag ${t}">${TYPES[t].name}</span>`;
+  const capRow = (k) => {
+    const c = S.cap[k], d = S.peak[k];
+    const pct = c ? Math.min(100, (d / c) * 100) : d ? 100 : 0;
+    const col = d > c ? 'var(--crit)' : pct > 85 ? 'var(--warn)' : 'var(--ok)';
+    return `<div class="cap"><span>${TYPES[k].name}</span><div class="bar"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}</span></div>`;
+  };
+
+  const TAB = {
+    obj() {
+      if (!S.sel) return `<h3>Объект</h3><p class="muted">Нажмите на клетку зала. Чтобы строить, выберите инструмент под планом и нажимайте на пустые клетки.</p>
+        <dl class="kv"><dt>Перегрев</dt><dd class="warn">от 32 °C, мощность −15%</dd><dt>Критично</dt><dd class="crit">от 40 °C, поломки ×10</dd><dt>Пожар</dt><dd class="crit">от 44 °C</dd></dl>`;
+      const { h, i } = S.sel;
+      const t = S.halls[h].grid[i];
+      const where = `${HALLS[h].name} · клетка ${tileName(h, i)}`;
+      if (!t) {
+        return `<h3>${where}</h3><p class="muted">Пустая плитка фальшпола.</p><div class="shop">${Object.keys(BUILD).map((k) => {
+          const b = BUILD[k]; const locked = b.req && !hasTech(b.req);
+          return `<button class="btn" type="button" data-act="build" data-a="${k}" ${locked || S.money < b.price ? 'disabled' : ''}><span>${b.name}<small>${locked ? 'Нужно исследование' : b.desc}${b.kw ? ` Потребляет ${b.kw} кВт.` : ''}</small></span><span class="price">${fmt$(b.price)}</span></button>`;
+        }).join('')}</div>`;
+      }
+      if (t.k === 'rack') {
+        const tc = t.temp > 40 ? 'crit' : t.temp > 32 ? 'warn' : 'ok';
+        const working = t.s.length - t.broken;
+        const repairCost = t.s.slice(working).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
+        const fire = t.fire ? `<button class="btn hot" type="button" data-act="extinguish">ТУШИТЬ ПОЖАР</button>` : '';
+        const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${MODELS[m].cap} ${TYPES[MODELS[m].type].unit}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать</button></div>`).join('');
+        const shop = t.s.length < RACK_SLOTS ? `<h3>Добавить сервер (${t.s.length}/${RACK_SLOTS})</h3><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].req || hasTech(MODELS[k].req)).map((k) => {
+          const m = MODELS[k];
+          return `<button class="btn" type="button" data-act="addsrv" data-a="${k}" ${S.money < m.price ? 'disabled' : ''}><span>${m.name} ${typeTag(m.type)}<small>${m.cap} ${TYPES[m.type].unit} · тепло ${m.heat} · ${m.kw} кВт</small></span><span class="price">${fmt$(m.price)}</span></button>`;
+        }).join('')}</div>` : '<p class="muted">Стойка заполнена.</p>';
+        return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}
+          <dl class="kv"><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
+          ${t.broken ? `<button class="btn primary" type="button" data-act="repair" ${S.money < repairCost ? 'disabled' : ''}>Починить сейчас · ${fmt$(repairCost)}</button>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
+          <div class="slots">${slots || '<p class="muted">Пустая стойка.</p>'}</div>${shop}
+          <button class="btn danger" type="button" data-act="demolish">Демонтировать стойку · +${fmt$(refund(t))}</button>`;
+      }
+      const b = BUILD[t.k];
+      return `<h3>${where}</h3><p class="ttl">${b.name}</p><p class="muted">${b.desc}</p>${b.kw ? `<dl class="kv"><dt>Потребление</dt><dd>${b.kw} кВт</dd></dl>` : ''}<button class="btn danger" type="button" data-act="demolish">Демонтировать · +${fmt$(refund(t))}</button>`;
+    },
+    deals() {
+      const L = repLevel();
+      const active = S.contracts.map((c) => {
+        const up = c.hrs ? (c.ok / c.hrs) * 100 : 100;
+        const ok = up >= c.sla;
+        return `<div class="item"><div class="row"><b>${c.name}</b>${typeTag(c.type)}</div>
+          <div class="row meta"><span>${KINDS[c.kind].label} · ${fmtN(c.amount)} ${TYPES[c.type].unit}</span><span>${fmt$(c.pay)}/ч</span></div>
+          <div class="row meta"><span class="${ok ? 'ok' : 'crit'}">аптайм ${up.toFixed(2)}% / SLA ${c.sla}%</span><span>ещё ${Math.ceil(c.left / 24)} дн.</span></div>
+          <div class="row"><span></span><button class="btn sm danger" type="button" data-act="cancel" data-a="${c.id}">Расторгнуть · −${fmt$(c.pay * 24)}</button></div></div>`;
+      }).join('');
+      const offers = S.offers.map((o) => {
+        const can = L >= o.lvl;
+        return `<div class="item"><div class="row"><b>${o.name}</b>${typeTag(o.type)}</div>
+          <div class="row meta"><span>${KINDS[o.kind].label} · пик ${fmtN(o.amount)} ${TYPES[o.type].unit}</span><span>${fmt$(o.pay)}/ч</span></div>
+          <div class="row meta"><span>SLA ${o.sla}% · ${o.days} дн. · ${'★'.repeat(o.lvl)}</span><span>${fmt$(o.pay * 24)}/день</span></div>
+          <div class="row"><span class="meta">исчезнет через ${o.expires} ч</span><span><button class="btn sm" type="button" data-act="reject" data-a="${o.id}">Отказать</button> <button class="btn sm primary" type="button" data-act="sign" data-a="${o.id}" ${can ? '' : 'disabled'}>${can ? 'Подписать' : 'Мала репутация'}</button></span></div></div>`;
+      }).join('');
+      return `<h3>Загрузка в пик: контракты / мощность</h3>${['cpu', 'sto', 'gpu'].map(capRow).join('')}
+        <p class="muted">Нагрузка клиентов меняется по часам: сайты пикуют днём, игры и видео вечером, ИИ — круглые сутки. Не хватит мощности — упадёт аптайм и репутация.</p>
+        <h3>Предложения</h3><div class="list">${offers || '<p class="muted">Новых предложений пока нет. Менеджеры продаж приводят больше клиентов.</p>'}</div>
+        <h3>Активные контракты (${S.contracts.length})</h3><div class="list">${active || '<p class="muted">Нет контрактов — серверы простаивают.</p>'}</div>`;
+    },
+    staff() {
+      const total = Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0);
+      return `<h3>Персонал · зарплаты ${fmt$(total)}/день</h3><div class="list">${Object.keys(STAFF).map((k) => {
+        const R = STAFF[k];
+        const busy = k === 'admin' ? ` · заняты ${S.jobs.length}` : '';
+        return `<div class="item"><div class="row"><b>${R.name}</b><span class="meta">${fmt$(R.pay)}/день</span></div><p class="muted">${R.desc}</p>
+          <div class="row"><span class="meta">В штате: ${S.staff[k]}${R.max ? ` из ${R.max}` : ''}${busy}</span><span><button class="btn sm" type="button" data-act="fireStaff" data-a="${k}" ${S.staff[k] ? '' : 'disabled'}>Уволить</button> <button class="btn sm primary" type="button" data-act="hire" data-a="${k}" ${R.max && S.staff[k] >= R.max ? 'disabled' : ''}>Нанять</button></span></div></div>`;
+      }).join('')}</div>`;
+    },
+    tech() {
+      const r = S.research;
+      const cur = r ? TECH.find((t) => t.id === r.id) : null;
+      return `${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="bar"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
+        <div class="list">${TECH.map((t) => {
+          const done = hasTech(t.id);
+          const reqOk = !t.req || t.req.every(hasTech);
+          const reqTxt = t.req ? `Нужно: ${t.req.map((id) => TECH.find((x) => x.id === id).name).join(', ')}` : '';
+          return `<div class="item ${done ? 'done' : ''}"><div class="row"><b>${t.name}</b><span class="meta">${done ? 'изучено' : `${fmt$(t.price)} · ${t.days.toString().replace('.', ',')} дн.`}</span></div><p class="muted">${t.desc}${!done && !reqOk ? ` ${reqTxt}.` : ''}</p>
+            ${done ? '' : `<div class="row"><span></span><button class="btn sm primary" type="button" data-act="research" data-a="${t.id}" ${!reqOk || r || S.money < t.price ? 'disabled' : ''}>Исследовать</button></div>`}</div>`;
+        }).join('')}</div>`;
+    },
+    fin() {
+      const d = S.today;
+      const hist = S.history;
+      let chart = '<p class="muted">График появится после первого дня.</p>';
+      if (hist.length) {
+        const W = 340, Hh = 120, max = Math.max(1, ...hist.map((x) => Math.abs(x.net)));
+        const bw = W / Math.max(hist.length, 10);
+        const mid = Hh / 2;
+        chart = `<svg class="chart" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none" role="img" aria-label="Чистая прибыль по дням"><line x1="0" x2="${W}" y1="${mid}" y2="${mid}" stroke="#26313c"/>${hist.map((x, n) => {
+          const hgt = (Math.abs(x.net) / max) * (mid - 4);
+          return `<rect x="${n * bw + 1}" y="${x.net >= 0 ? mid - hgt : mid}" width="${bw - 2}" height="${Math.max(1, hgt)}" fill="${x.net >= 0 ? '#4fd18b' : '#ff5f5f'}"/>`;
+        }).join('')}</svg>`;
+      }
+      const assets = S.halls.reduce((a, H) => a + H.grid.reduce((b, t) => b + (t ? refund(t) * 2 : 0), 0), 0);
+      const yest = hist.length ? hist[hist.length - 1].net : 0;
+      const value = S.money + assets * 0.6 + Math.max(0, yest) * 30;
+      return `<h3>Сегодня</h3><dl class="kv"><dt>Доход от клиентов</dt><dd class="ok">${fmt$(d.inc)}</dd><dt>Электричество</dt><dd>${fmt$(-d.elec)}</dd><dt>Покупки, штрафы, награды</dt><dd>${fmt$(-d.other)}</dd><dt>Зарплаты (в полночь)</dt><dd>${fmt$(-Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0))}</dd><dt>Аренда (в полночь)</dt><dd>${fmt$(-HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0))}</dd></dl>
+        <h3>Чистая прибыль по дням</h3>${chart}
+        <dl class="kv"><dt>Серверов</dt><dd>${countServers()}</dd><dt>Лучший день</dt><dd>${fmt$(S.stats.bestDay)}</dd><dt>Контрактов выполнено / провалено</dt><dd>${S.stats.done} / ${S.stats.failed}</dd><dt>Оценка компании</dt><dd>${fmt$(value)}</dd></dl>
+        ${S.debtDays ? `<p class="crit">Счёт в минусе ${S.debtDays} дн. На 3-й день — банкротство.</p>` : ''}`;
+    },
+    goals() {
+      return `<div class="list">${GOALS.map((g, n) => `<div class="item ${n < S.goal ? 'done' : n === S.goal ? 'cur' : ''}"><div class="row"><span>${n < S.goal ? '✓ ' : ''}${g.t}</span><span class="meta">+${fmt$(g.r)}</span></div></div>`).join('')}</div>`;
+    },
+  };
+
+  // ================= RENDER: CANVAS =================
+  const cv = $('#cv');
+  const ctx = cv.getContext('2d');
+  let T = 48, O = 18, hover = -1;
+  const COL = {
+    room: '#090d11', floor: '#111820', floor2: '#0e141a', seam: '#1a232c', wall: '#33414f',
+    rack: '#1a2430', rackEdge: '#3a4958', slot: '#070b0f', led: '#4fd18b', bad: '#ff5f5f', warn: '#f2b24a',
+    cpu: '#4a8fd6', sto: '#a184e6', gpu: '#e8913f', crac: '#3c5163', fan: '#a9cdee', ups: '#20303a', gen: '#d9b43a', trafo: '#3a4652', bolt: '#f2d24a',
+    accent: '#6cb4ff', text: '#d6e0ea', dim: '#7a8897', shirt: '#6cb4ff', skin: '#e8c4a0', guard: '#55687a',
+  };
+
+  function layoutCanvas() {
+    const D = HALLS[S.cur];
+    const box = $('#cbox');
+    const avail = Math.max(240, box.clientWidth - 18);
+    T = Math.floor(clamp(avail / (D.w + 0.8), 26, 64));
+    O = Math.round(T * 0.4);
+    const w = D.w * T + O * 2, h = D.h * T + O * 2;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = w * dpr; cv.height = h * dpr;
+    cv.style.width = `${w}px`; cv.style.height = `${h}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function tempColor(t) {
+    if (t < 26) return 'rgba(80,150,255,.45)';
+    if (t < 32) return 'rgba(79,209,139,.45)';
+    if (t < 40) return 'rgba(242,178,74,.55)';
+    return 'rgba(255,95,95,.65)';
+  }
+
+  function draw(now, frac) {
+    const hi = S.cur, D = HALLS[hi], H = S.halls[hi];
+    const W = D.w * T + O * 2, Hh = D.h * T + O * 2;
+    ctx.fillStyle = COL.room; ctx.fillRect(0, 0, W, Hh);
+    // walls + door
+    ctx.strokeStyle = COL.wall; ctx.lineWidth = 3;
+    ctx.strokeRect(O / 2, O / 2, W - O, Hh - O);
+    const doorY = O + (D.h / 2) * T;
+    ctx.fillStyle = COL.room; ctx.fillRect(0, doorY - T * 0.45, O, T * 0.9);
+    ctx.fillStyle = COL.dim; ctx.font = `600 ${Math.max(8, T * 0.18)}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < D.w * D.h; i++) {
+      const x = O + (i % D.w) * T, y = O + Math.floor(i / D.w) * T;
+      ctx.fillStyle = ((i % D.w) + Math.floor(i / D.w)) % 2 ? COL.floor : COL.floor2;
+      ctx.fillRect(x, y, T, T);
+      ctx.strokeStyle = COL.seam; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
+      if (!H.open) continue;
+      const t = H.grid[i];
+      if (!t) { if (i % 3 === 0) { ctx.fillStyle = COL.seam; for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) ctx.fillRect(x + T * (0.3 + a * 0.2), y + T * (0.3 + b * 0.2), 1.5, 1.5); } continue; }
+      drawTile(t, x, y, now, H.dark, i);
     }
-    box.querySelector('.left').textContent = left;
-    box.hidden = false;
-  }
 
-  function statusText(s) {
-    if (s.status === 'down') return ['Упал — нужна перезагрузка', 'crit'];
-    if (!s.powered) return ['Нет питания', 'crit'];
-    if (s.status === 'boot') return ['Загружается…', 'warn'];
-    if (s.status === 'disk') return ['Сбой диска, −50% мощности', 'warn'];
-    return ['В работе', 'ok'];
-  }
+    if (H.open) {
+      // overlays
+      if (S.view === 'heat') {
+        H.grid.forEach((t, i) => {
+          if (!t) return;
+          const x = O + (i % D.w) * T, y = O + Math.floor(i / D.w) * T;
+          const b = BUILD[t.k];
+          if (b && b.cool) {
+            ctx.fillStyle = 'rgba(108,180,255,.08)';
+            ctx.fillRect(x - b.r * T, y - b.r * T, (b.r * 2 + 1) * T, (b.r * 2 + 1) * T);
+          }
+        });
+        H.grid.forEach((t, i) => {
+          if (!t || t.k !== 'rack') return;
+          const x = O + (i % D.w) * T, y = O + Math.floor(i / D.w) * T;
+          ctx.fillStyle = tempColor(t.temp); ctx.fillRect(x + 2, y + 2, T - 4, T - 4);
+          ctx.fillStyle = '#fff'; ctx.font = `700 ${Math.max(9, T * 0.24)}px JetBrains Mono, monospace`;
+          ctx.fillText(`${Math.round(t.temp)}°`, x + T / 2, y + T / 2);
+        });
+      } else if (S.view === 'power') {
+        H.grid.forEach((t, i) => {
+          if (!t) return;
+          const x = O + (i % D.w) * T, y = O + Math.floor(i / D.w) * T;
+          const kw = t.k === 'rack' ? t.s.reduce((a, m) => a + MODELS[m].kw, 0) : (BUILD[t.k].kw || 0);
+          const b = BUILD[t.k];
+          const label = b && b.power ? `+${b.power}` : b && b.backup ? `R${b.backup}` : kw ? kw.toFixed(1) : '';
+          if (!label) return;
+          ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x + 2, y + T * 0.32, T - 4, T * 0.36);
+          ctx.fillStyle = b && (b.power || b.backup) ? COL.bolt : COL.text; ctx.font = `700 ${Math.max(9, T * 0.22)}px JetBrains Mono, monospace`;
+          ctx.fillText(label, x + T / 2, y + T / 2);
+        });
+      }
 
-  function renderInspector() {
-    const box = $('#insp');
-    const sel = S.sel;
-    box.classList.toggle('open', !!sel);
-    const s = sel && S.racks[sel.r].slots[sel.u];
-    const afford = (p) => (S.money >= p ? '' : 'disabled');
-    let key, head = '', stats = '', actions = '';
+      // staff
+      const door = { x: O * 0.2, y: doorY };
+      const jobsHere = S.jobs.filter((j) => j.h === hi);
+      jobsHere.forEach((j, n) => {
+        const tx = O + (j.i % D.w) * T + T * 0.5, ty = O + Math.floor(j.i / D.w) * T + T * 0.95;
+        const p = clamp((j.t + frac) / j.travel, 0, 1);
+        const px = door.x + (tx - door.x) * p, py = door.y + (ty - door.y) * p;
+        drawPerson(px, py, now + n * 300, p < 1, COL.shirt, j.kind === 'fire');
+      });
+      const idle = Math.max(0, S.staff.admin - S.jobs.length);
+      if (hi === 0 || jobsHere.length === 0) {
+        for (let n = 0; n < Math.min(idle, 4); n++) drawPerson(O * 0.5 + 4, doorY - T * 0.5 - n * T * 0.28, now + n * 500, false, COL.shirt, false, true);
+      }
+      if (S.staff.guard > 0) {
+        const per = 2 * (D.w + D.h) * T;
+        const d = ((now / 1000) * T * 0.9) % per;
+        let gx, gy;
+        if (d < D.w * T) { gx = O + d; gy = O - O * 0.15; }
+        else if (d < (D.w + D.h) * T) { gx = O + D.w * T + O * 0.15; gy = O + d - D.w * T; }
+        else if (d < (2 * D.w + D.h) * T) { gx = O + D.w * T - (d - (D.w + D.h) * T); gy = O + D.h * T + O * 0.15; }
+        else { gx = O - O * 0.15; gy = O + D.h * T - (d - (2 * D.w + D.h) * T); }
+        drawPerson(gx, gy, now, true, COL.guard, false);
+      }
 
-    if (!sel) {
-      key = 'none';
-      head = `<h2>Инспектор</h2><p class="insp-sub">Выберите юнит в стойке, чтобы поставить оборудование или обслужить сервер.</p>`;
-      stats = `<dl class="kv"><dt>Сервер L1</dt><dd>${CAP[1]} тыс. запр/с</dd><dt>Сервер L2</dt><dd>${CAP[2]} тыс. запр/с</dd><dt>Сервер L3</dt><dd>${CAP[3]} тыс. запр/с</dd><dt>Перегрев</dt><dd class="crit">от 92 °C</dd></dl>`;
-    } else if (!s) {
-      key = `empty|${sel.r}|${sel.u}|${[PRICE.server, PRICE.cooler, PRICE.ups].map((p) => S.money >= p).join()}`;
-      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-sub">Свободный юнит. Что ставим?</p>`;
-      actions = `<div class="shop">
-        <button class="btn primary" type="button" data-act="buy" data-arg="server" ${afford(PRICE.server)}><span>Сервер L1<small>+${CAP[1]} тыс. запр/с, сильно греется</small></span><span class="price">${money(PRICE.server)}</span></button>
-        <button class="btn" type="button" data-act="buy" data-arg="cooler" ${afford(PRICE.cooler)}><span>Кондиционер<small>Снимает ${COOL} ед. тепла в стойке</small></span><span class="price">${money(PRICE.cooler)}</span></button>
-        <button class="btn" type="button" data-act="buy" data-arg="ups" ${afford(PRICE.ups)}><span>ИБП<small>Держит 4 сервера стойки без питания</small></span><span class="price">${money(PRICE.ups)}</span></button>
-      </div>`;
-    } else if (s.kind === 'server') {
-      const next = PRICE.up[s.level + 1];
-      key = `srv|${sel.r}|${sel.u}|${s.level}|${s.status}|${s.powered}|${next ? S.money >= next : 'max'}|${S.money >= PRICE.disk}`;
-      const [st, cls] = statusText(s);
-      const r = S.racks[sel.r];
-      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">${nameOf(sel.r, sel.u)} · уровень ${s.level}</p><p class="insp-sub">Мощность ${CAP[s.level]} тыс. запр/с</p>`;
-      const tc = s.temp >= 85 ? 'crit' : s.temp >= 72 ? 'warn' : '';
-      stats = `<dl class="kv"><dt>Статус</dt><dd class="${cls}">${st}</dd><dt>Нагрузка</dt><dd>${Math.round(s.load * 100)}%</dd><dt>Температура</dt><dd class="${tc}">${Math.round(s.temp)} °C</dd><dt>Тепло стойки</dt><dd class="${r.heat > r.cool ? 'crit' : ''}">${Math.round(r.heat)} / охл. ${r.cool}</dd></dl>`;
-      const a = [];
-      if (s.status === 'down') a.push(`<button class="btn primary" type="button" data-act="reboot">Перезагрузить</button>`);
-      if (s.status === 'disk') a.push(`<button class="btn primary" type="button" data-act="disk" ${afford(PRICE.disk)}>Заменить диск · ${money(PRICE.disk)}</button>`);
-      if (next) a.push(`<button class="btn" type="button" data-act="upgrade" ${afford(next)}>Апгрейд до L${s.level + 1} (${CAP[s.level + 1]} тыс.) · ${money(next)}</button>`);
-      a.push(`<button class="btn danger" type="button" data-act="sell">Продать · +${money(s.spent / 2)}</button>`);
-      actions = `<div class="actions">${a.join('')}</div>`;
-    } else if (s.kind === 'cooler') {
-      key = `cool|${sel.r}|${sel.u}|${s.broken}|${S.money >= PRICE.fix}`;
-      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">Кондиционер</p><p class="insp-sub">Снимает ${COOL} ед. тепла со всей стойки.</p>`;
-      stats = `<dl class="kv"><dt>Статус</dt><dd class="${s.broken ? 'crit' : 'ok'}">${s.broken ? 'Сломан' : 'Работает'}</dd></dl>`;
-      actions = `<div class="actions">${s.broken ? `<button class="btn primary" type="button" data-act="fix" ${afford(PRICE.fix)}>Починить · ${money(PRICE.fix)}</button>` : ''}<button class="btn danger" type="button" data-act="sell">Продать · +${money(PRICE.cooler / 2)}</button></div>`;
-    } else {
-      key = `ups|${sel.r}|${sel.u}`;
-      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">ИБП</p><p class="insp-sub">При отключении питания держит 4 сервера этой стойки (сверху вниз).</p>`;
-      actions = `<div class="actions"><button class="btn danger" type="button" data-act="sell">Продать · +${money(PRICE.ups / 2)}</button></div>`;
+      // hover ghost
+      if (hover >= 0 && S.tool !== 'select') {
+        const x = O + (hover % D.w) * T, y = O + Math.floor(hover / D.w) * T;
+        const t = H.grid[hover];
+        const okPlace = S.tool === 'demolish' ? !!t : !t;
+        ctx.strokeStyle = okPlace ? COL.accent : COL.bad; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+        ctx.strokeRect(x + 2, y + 2, T - 4, T - 4); ctx.setLineDash([]);
+        const b = BUILD[S.tool];
+        if (b && b.cool && okPlace) { ctx.strokeStyle = 'rgba(108,180,255,.4)'; ctx.strokeRect(x - b.r * T, y - b.r * T, (b.r * 2 + 1) * T, (b.r * 2 + 1) * T); }
+      }
+      // selection
+      if (S.sel && S.sel.h === hi) {
+        const x = O + (S.sel.i % D.w) * T, y = O + Math.floor(S.sel.i / D.w) * T;
+        ctx.strokeStyle = COL.accent; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, T - 2, T - 2);
+        const t = H.grid[S.sel.i]; const b = t && BUILD[t.k];
+        if (b && b.cool) { ctx.strokeStyle = 'rgba(108,180,255,.35)'; ctx.setLineDash([3, 3]); ctx.strokeRect(x - b.r * T, y - b.r * T, (b.r * 2 + 1) * T, (b.r * 2 + 1) * T); ctx.setLineDash([]); }
+      }
+      if (H.dark) {
+        ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(O, O, D.w * T, D.h * T);
+        ctx.fillStyle = COL.bad; ctx.font = `800 ${Math.max(12, T * 0.4)}px Unbounded, sans-serif`;
+        if (Math.floor(now / 500) % 2) ctx.fillText('НЕТ ПИТАНИЯ', O + (D.w * T) / 2, O + (D.h * T) / 2);
+      }
     }
+  }
 
-    if (key !== inspKey) {
-      inspKey = key;
-      box.innerHTML = `${head}<div class="insp-stats">${stats}</div>${actions}`;
-    } else {
-      box.querySelector('.insp-stats').innerHTML = stats;
+  function drawPerson(x, y, now, walking, shirt, hurry, sitting) {
+    const s = T * 0.17;
+    const bob = walking ? Math.sin(now / (hurry ? 70 : 110)) * s * 0.25 : 0;
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath(); ctx.ellipse(x, y + s * 0.1, s * 0.9, s * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = shirt;
+    ctx.beginPath(); ctx.ellipse(x, y - s * 1.0 + bob, s * 0.75, s * (sitting ? 0.8 : 1.0), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COL.skin;
+    ctx.beginPath(); ctx.arc(x, y - s * 2.1 + bob, s * 0.55, 0, Math.PI * 2); ctx.fill();
+    if (hurry) { ctx.fillStyle = COL.bad; ctx.fillRect(x + s * 0.6, y - s * 1.5 + bob, s * 0.5, s * 0.9); }
+  }
+
+  function drawTile(t, x, y, now, dark, i) {
+    const p = T * 0.1;
+    if (t.k === 'rack') {
+      ctx.fillStyle = COL.rack; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      ctx.strokeStyle = t.temp > 40 ? COL.bad : t.temp > 32 ? COL.warn : COL.rackEdge;
+      ctx.lineWidth = t.temp > 32 ? 2 : 1;
+      ctx.strokeRect(x + p + 0.5, y + p + 0.5, T - 2 * p - 1, T - 2 * p - 1);
+      const sh = (T - 2 * p - 4) / RACK_SLOTS;
+      const working = t.s.length - t.broken;
+      for (let n = 0; n < RACK_SLOTS; n++) {
+        const sy = y + p + 2 + n * sh;
+        ctx.fillStyle = COL.slot; ctx.fillRect(x + p + 2, sy + 0.5, T - 2 * p - 4, sh - 1);
+        const m = t.s[n];
+        if (!m) continue;
+        const M = MODELS[m];
+        ctx.fillStyle = COL[M.type]; ctx.globalAlpha = dark ? 0.3 : 0.85;
+        ctx.fillRect(x + p + 3, sy + 1, (T - 2 * p - 6) * 0.62, sh - 2);
+        ctx.globalAlpha = 1;
+        let led = COL.led, on = true;
+        if (dark) on = false;
+        else if (n >= working) { led = COL.bad; on = Math.floor(now / 300) % 2 === 0; }
+        else on = Math.sin(now / (60 + ((i * 7 + n * 13) % 50)) + n) > -0.3;
+        if (on) { ctx.fillStyle = led; ctx.fillRect(x + T - p - 3 - sh * 0.5, sy + sh * 0.25, Math.max(2, sh * 0.4), Math.max(2, sh * 0.5)); }
+      }
+      if (t.fire) {
+        for (let f = 0; f < 5; f++) {
+          const fx = x + T * (0.2 + f * 0.15), fl = T * (0.35 + 0.25 * Math.abs(Math.sin(now / 90 + f * 1.7)));
+          ctx.fillStyle = f % 2 ? '#ffb02e' : '#ff5a2a';
+          ctx.beginPath(); ctx.moveTo(fx - T * 0.09, y + T * 0.9); ctx.lineTo(fx, y + T * 0.9 - fl); ctx.lineTo(fx + T * 0.09, y + T * 0.9); ctx.fill();
+        }
+      }
+      return;
     }
+    const b = BUILD[t.k];
+    if (t.k === 'crac' || t.k === 'chiller') {
+      const big = t.k === 'chiller';
+      ctx.fillStyle = big ? '#2e4a5e' : COL.crac; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      ctx.strokeStyle = '#5f7d96'; ctx.lineWidth = 1; ctx.strokeRect(x + p + 0.5, y + p + 0.5, T - 2 * p - 1, T - 2 * p - 1);
+      const fans = big ? [[0.33, 0.5], [0.67, 0.5]] : [[0.5, 0.5]];
+      fans.forEach(([fx, fy]) => {
+        const cx = x + T * fx, cy = y + T * fy, r = T * (big ? 0.15 : 0.27);
+        ctx.fillStyle = '#16212b'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        const ang = dark ? 0 : now / 80;
+        ctx.strokeStyle = COL.fan; ctx.lineWidth = Math.max(1.5, T * 0.04);
+        for (let k = 0; k < 3; k++) {
+          const a = ang + (k * Math.PI * 2) / 3;
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * r * 0.9, cy + Math.sin(a) * r * 0.9); ctx.stroke();
+        }
+      });
+      return;
+    }
+    if (t.k === 'ups') {
+      ctx.fillStyle = COL.ups; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      const ev = S.event && S.event.type === 'outage';
+      const lvl = ev ? 0.3 + 0.7 * ((Math.sin(now / 400) + 1) / 2) : 1;
+      for (let n = 0; n < 4; n++) {
+        ctx.fillStyle = n < Math.ceil(lvl * 4) ? (ev ? COL.warn : COL.led) : '#132028';
+        ctx.fillRect(x + T * 0.3, y + T * (0.68 - n * 0.13), T * 0.4, T * 0.09);
+      }
+      return;
+    }
+    if (t.k === 'gen') {
+      ctx.fillStyle = '#222'; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      ctx.save(); ctx.beginPath(); ctx.rect(x + p, y + p, T - 2 * p, T * 0.2); ctx.clip();
+      for (let k = -2; k < 8; k++) { ctx.fillStyle = k % 2 ? COL.gen : '#222'; ctx.beginPath(); ctx.moveTo(x + k * T * 0.15, y + p); ctx.lineTo(x + (k + 1) * T * 0.15, y + p); ctx.lineTo(x + k * T * 0.15, y + p + T * 0.2); ctx.lineTo(x + (k - 1) * T * 0.15, y + p + T * 0.2); ctx.fill(); }
+      ctx.restore();
+      ctx.fillStyle = COL.gen; ctx.font = `800 ${Math.max(8, T * 0.2)}px JetBrains Mono, monospace`;
+      ctx.fillText('DG', x + T / 2, y + T * 0.6);
+      return;
+    }
+    if (t.k === 'trafo') {
+      ctx.fillStyle = COL.trafo; ctx.fillRect(x + p, y + p, T - 2 * p, T - 2 * p);
+      ctx.fillStyle = COL.bolt;
+      ctx.beginPath();
+      ctx.moveTo(x + T * 0.55, y + T * 0.2); ctx.lineTo(x + T * 0.32, y + T * 0.55); ctx.lineTo(x + T * 0.5, y + T * 0.55);
+      ctx.lineTo(x + T * 0.42, y + T * 0.82); ctx.lineTo(x + T * 0.68, y + T * 0.44); ctx.lineTo(x + T * 0.5, y + T * 0.44); ctx.closePath(); ctx.fill();
+      return;
+    }
+    ctx.fillStyle = COL.dim; ctx.fillText(b.name[0], x + T / 2, y + T / 2);
   }
 
-  function renderLog() {
-    $('#log').innerHTML = S.log.map((e) => `<li class="${e.lvl}"><time>${e.t}</time><span>${e.msg}</span></li>`).join('');
+  function tileAt(e) {
+    const D = HALLS[S.cur];
+    const r = cv.getBoundingClientRect();
+    const sx = (e.clientX - r.left) * (cv.clientWidth / r.width);
+    const sy = (e.clientY - r.top) * (cv.clientHeight / r.height);
+    const tx = Math.floor((sx - O) / T), ty = Math.floor((sy - O) / T);
+    if (tx < 0 || ty < 0 || tx >= D.w || ty >= D.h) return -1;
+    return ty * D.w + tx;
   }
+  cv.addEventListener('pointermove', (e) => { hover = tileAt(e); });
+  cv.addEventListener('pointerleave', () => { hover = -1; });
+  cv.addEventListener('click', (e) => {
+    if (!S.started || S.over) return;
+    const H = S.halls[S.cur];
+    if (!H.open) return;
+    const i = tileAt(e);
+    if (i < 0) return;
+    Sound.init();
+    const t = H.grid[i];
+    if (t && t.k === 'rack' && t.fire) { t.fire = 0; Sound.coin(); log(`Пожар в ${tileName(S.cur, i)} потушен`, 'good'); renderUI(); return; }
+    if (S.tool === 'select') { S.sel = { h: S.cur, i }; S.tab = 'obj'; Sound.click(); }
+    else if (S.tool === 'demolish') {
+      if (t) { S.sel = { h: S.cur, i }; ACT.demolish(); }
+    } else if (!t) {
+      place(S.tool, S.cur, i);
+      S.sel = { h: S.cur, i };
+      if (S.tool === 'rack') S.tab = 'obj';
+    } else { S.sel = { h: S.cur, i }; S.tab = 'obj'; }
+    renderUI();
+  });
 
-  function renderPause() {
-    $('#bPause').textContent = S.paused ? 'Продолжить' : 'Пауза';
-    document.querySelectorAll('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === S.speed)));
-  }
+  // ================= INPUT =================
+  document.addEventListener('pointerdown', (e) => { if (e.target.closest('#tab')) pressing = true; });
+  const release = () => setTimeout(() => { pressing = false; }, 0);
+  document.addEventListener('pointerup', release);
+  document.addEventListener('pointercancel', release);
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    Sound.init();
+    const f = ACT[b.dataset.act];
+    if (!f) return;
+    if (!['speed', 'pause', 'tab', 'view', 'tool', 'hall'].includes(b.dataset.act)) Sound.click();
+    f(b.dataset.a);
+    renderUI();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input,textarea')) return;
+    if (e.code === 'Space' && S.started && e.target === document.body) { e.preventDefault(); S.paused = !S.paused; renderUI(); }
+    if (e.key === 'Escape') { S.tool = 'select'; S.sel = null; renderUI(); }
+    const keys = { 1: 'rack', 2: 'crac', 3: 'chiller', 4: 'ups', 5: 'gen', 6: 'trafo' };
+    if (keys[e.key] && S.started) { const k = keys[e.key]; if (!BUILD[k].req || hasTech(BUILD[k].req)) { S.tool = k; renderUI(); } }
+  });
+  window.addEventListener('resize', () => layoutCanvas());
 
-  function showOverlay(mode, info) {
+  // ================= OVERLAYS =================
+  function showOverlay(mode) {
     const card = $('#card');
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { saved = null; }
     if (mode === 'start') {
-      card.innerHTML = `<h2>Ночная смена</h2>
-        <p>Вы — дежурный сисадмин. Трафик растёт каждый день, а железо греется и ломается.</p>
+      card.innerHTML = `<h2>ЦОД Магнат</h2>
+        <p>У вас каморка под лестницей, одна стойка и $3 000. Цель — построить гиперскейл-кампус на 3 мегаватта.</p>
         <ul>
-          <li>Ставьте серверы в свободные юниты, чтобы обслужить трафик.</li>
-          <li>Следите за теплом стойки: выше 92 °C сервер падает. Кондиционеры спасают.</li>
-          <li>ИБП держат сервера при отключении питания, фильтр отбивает DDoS.</li>
-          <li>Каждый недообслуженный запрос бьёт по репутации. Ноль — и смена окончена.</li>
+          <li>Подписывайте контракты с клиентами: сайты, банки, игры, видео, нейросети.</li>
+          <li>Ставьте стойки и серверы, следите за теплом и мощностью зала.</li>
+          <li>Нанимайте админов и безопасников, исследуйте технологии, арендуйте новые залы.</li>
+          <li>Пожары, DDoS, отключения света и экскаваторы прилагаются.</li>
         </ul>
-        <button class="btn primary" type="button" data-act="start">Начать смену</button>`;
+        ${saved && saved.v === 1 && !saved.over ? `<button class="btn primary" type="button" data-act="load">Продолжить · день ${saved.day}, ${fmt$(saved.money)}</button><button class="btn" type="button" data-act="newgame">Новая игра</button>` : `<button class="btn primary" type="button" data-act="newgame">Начать</button>`}`;
+    } else if (mode === 'menu') {
+      card.innerHTML = `<h2>Пауза</h2><p>Игра сохраняется сама каждый игровой день.</p>
+        <button class="btn primary" type="button" data-act="resume">Продолжить</button>
+        <button class="btn" type="button" data-act="save">Сохранить сейчас</button>
+        <button class="btn danger" type="button" data-act="reset">Начать заново</button>`;
+    } else if (mode === 'confirm') {
+      card.innerHTML = `<h2>Начать заново?</h2><p>Текущий прогресс будет удалён.</p>
+        <button class="btn danger" type="button" data-act="newgame">Да, удалить и начать</button>
+        <button class="btn" type="button" data-act="resume">Отмена</button>`;
+    } else if (mode === 'win') {
+      Sound.win();
+      card.innerHTML = `<h2>Вы — гиперскейлер</h2><p>За ${S.day} дней вы прошли путь от каморки под лестницей до кампуса на 3 мегаватта. Серверов: ${countServers()}.</p>
+        <button class="btn primary" type="button" data-act="keep">Играть дальше</button>`;
     } else {
-      const days = (v) => `${v.toFixed(1).replace('.', ',')} дн.`;
-      card.innerHTML = `<h2>Сервис лёг</h2>
-        <p>${info.isBest ? 'Новый рекорд смены.' : 'Клиенты ушли к конкурентам.'}</p>
-        <div class="score">
-          <div class="stat"><span class="k">Продержались</span><span class="v">${days(info.result)}</span></div>
-          <div class="stat"><span class="k">Заработано</span><span class="v">${money(S.earned)}</span></div>
-          <div class="stat"><span class="k">Рекорд</span><span class="v">${days(info.best)}</span></div>
-        </div>
-        <button class="btn primary" type="button" data-act="restart">Новая смена</button>`;
+      card.innerHTML = `<h2>Банкротство</h2><p>Три дня в минусе — кредиторы забрали серверы. Вы продержались ${S.day} дней и выполнили ${S.stats.done} контрактов.</p>
+        <button class="btn primary" type="button" data-act="newgame">Новая игра</button>`;
     }
     $('#overlay').hidden = false;
   }
+  ACT.load = () => {
+    try {
+      const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (data && data.v === 1) { S = data; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
+    } catch (e) { /* fall through */ }
+    ACT.newgame();
+  };
 
-  // ---------- input ----------
-  document.addEventListener('click', (e) => {
-    const unit = e.target.closest('.unit');
-    if (unit && !S.over) {
-      const r = Number(unit.dataset.r), u = Number(unit.dataset.u);
-      if (!S.racks[r].owned) return;
-      S.sel = S.sel && S.sel.r === r && S.sel.u === u ? null : { r, u };
-      render();
-      return;
+  function save() {
+    if (S.over) return;
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S && S.started) save(); });
+
+  // ================= LOOP =================
+  let acc = 0, prev = performance.now();
+  function frame(now) {
+    const dt = Math.min(250, now - prev); prev = now;
+    if (S.started && !S.paused && !S.over && $('#overlay').hidden) {
+      acc += dt * S.speed;
+      let n = 0, ticked = false;
+      while (acc >= HOUR_MS && n < 12 && !S.over) { tick(); acc -= HOUR_MS; n++; ticked = true; }
+      if (n >= 12) acc = 0;
+      if (ticked) renderUI();
     }
-    const btn = e.target.closest('[data-act]');
-    if (!btn || btn.disabled) return;
-    const a = btn.dataset.act;
-    if (a === 'start') { S.started = true; $('#overlay').hidden = true; return; }
-    if (a === 'restart') { S = newState(); S.started = true; $('#overlay').hidden = true; buildRacks(); renderLog(); boot(); render(); return; }
-    act(a, btn.dataset.arg);
-  });
-  document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { S.speed = Number(b.dataset.speed); S.paused = false; renderPause(); }));
-  $('#bPause').addEventListener('click', () => { S.paused = !S.paused; renderPause(); });
-  document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && S.started && !S.over && e.target === document.body) { e.preventDefault(); S.paused = !S.paused; renderPause(); }
-    if (e.key === 'Escape' && S.sel) { S.sel = null; render(); }
-  });
+    draw(now, S.paused ? 0 : acc / HOUR_MS);
+    requestAnimationFrame(frame);
+  }
 
-  function boot() {
-    log('Смена началась. Две машины в стойке A, трафик скромный');
+  function afterLoad() {
+    for (const k in last) delete last[k];
+    logDirty = true;
+    layoutCanvas();
+    renderUI();
   }
 
   function start(data) {
-    S = data && data.S ? data.S : newState();
-    buildRacks();
-    renderLog();
-    if (!S.log.length) boot();
-    render();
-    if (S.over) gameOver();
-    else if (!S.started) showOverlay('start');
-    setInterval(() => {
-      if (!S.started || S.paused || S.over) return;
-      for (let i = 0; i < S.speed && !S.over; i++) tick();
-      render();
-    }, TICK_MS);
+    if (data && data.S) { S = data.S; } else { newState(); }
+    afterLoad();
+    if (!S.started) showOverlay('start');
+    else if (S.over) showOverlay('over');
+    requestAnimationFrame(frame);
   }
 
   window.claude?.hot?.snapshot?.(() => ({ S }));
