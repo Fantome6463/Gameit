@@ -135,25 +135,18 @@ button { font: inherit; color: inherit; }
   position: relative; background: var(--bay); border: 1px solid var(--line); border-radius: 6px;
   overflow: hidden; display: grid; place-items: center; padding: 8px; min-height: 280px;
 }
-.canvasbox.is3d { padding: 0; }
 canvas { display: block; touch-action: manipulation; cursor: pointer; max-width: 100%; }
-#gl { width: 100%; touch-action: none; cursor: grab; }
-#gl:active { cursor: grabbing; }
-.hint3d {
-  position: absolute; right: 10px; top: 10px; pointer-events: none;
-  font: 500 11px var(--f-mono); color: var(--dim); background: rgba(9, 13, 17, .7); padding: 3px 8px; border-radius: 3px;
-}
-.mail {
-  position: absolute; left: 10px; bottom: 10px; z-index: 3; width: min(380px, calc(100% - 20px));
-  display: grid; gap: 8px; padding: 12px 14px;
-  background: rgba(19, 26, 33, .96); border: 1px solid var(--accent); border-radius: 6px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .55);
-}
-.mail .who { display: flex; justify-content: space-between; gap: 8px; font: 600 11px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
-.mail .who span { color: var(--dim); letter-spacing: 0; text-transform: none; }
-.mail p { margin: 0; font-size: 13.5px; }
-.mail .opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag.urgent { background: rgba(255, 95, 95, .2); color: #ff9c9c; }
+.mkt { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mkt div { padding: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; display: grid; gap: 2px; }
+.mkt b { font: 600 16px var(--f-mono); }
+.mkt svg { width: 100%; height: 26px; display: block; }
+.up { color: var(--ok); } .down { color: var(--crit); }
+.bids { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.bids .btn { flex-direction: column; align-items: center; gap: 0; padding: 6px 4px; }
+.bids .btn small { font: 500 11px var(--f-mono); color: var(--dim); }
+.bids .btn[aria-pressed="true"] { border-color: var(--accent); background: rgba(108, 180, 255, .16); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 6px; }
 .lockcard { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center; padding: 16px; background: rgba(9, 13, 17, .78); }
 .lockcard h3 { margin: 0; font: 800 18px var(--f-display); text-transform: uppercase; }
 .lockcard p { margin: 0; color: var(--dim); }
@@ -166,14 +159,14 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 /* Side */
 .side { display: grid; gap: 12px; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
-.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); border-bottom: 1px solid var(--line); }
+.tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); border-bottom: 1px solid var(--line); }
 .tabs button {
   padding: 9px 6px; border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer; white-space: nowrap;
   font: 600 12px var(--f-body); color: var(--dim);
 }
 .tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
 .tabs button sup { font: 600 9px var(--f-mono); color: var(--accent); }
-.tabbody { padding: 14px; height: min(620px, 72vh); overflow: auto; overscroll-behavior: contain; display: grid; gap: 12px; align-content: start; }
+.tabbody { padding: 14px; height: min(620px, 72vh); overflow: auto; overscroll-behavior: contain; display: grid; grid-auto-rows: max-content; gap: 12px; align-content: start; }
 .tabbody h3 { margin: 0; font: 600 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
 .tabbody p { margin: 0; }
 .muted { color: var(--dim); font-size: 13px; }
@@ -280,9 +273,6 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       <div class="hallinfo" id="hallinfo"></div>
       <div class="canvasbox" id="cbox">
         <canvas id="cv" aria-label="План зала"></canvas>
-        <canvas id="gl" aria-label="Зал в 3D" hidden></canvas>
-        <div class="hint3d" id="hint3d" hidden>тяни — вращать · колесо — зум · ПКМ — сдвиг</div>
-        <div class="mail" id="mail" hidden></div>
         <div class="lockcard" id="lockcard" hidden></div>
       </div>
       <div class="tools" id="tools"></div>
@@ -299,8 +289,6 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 <div class="toast" id="toast" hidden></div>
 <div class="overlay" id="overlay" hidden><div class="card" id="card"></div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (() => {
   'use strict';
@@ -338,6 +326,34 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     miner: { name: 'ASIC-ферма соседей', price: 0, kw: 6, hidden: true, desc: 'Чужая майнинг-ферма. Платит $30 в час, но выдаёт 40 ед. тепла и забирает охлаждение у соседних стоек.' },
   };
   const MINER_HEAT = 40;
+  const TRENDS = [
+    { name: 'ИИ-бум', desc: 'Все хотят нейросети: аренда GPU дорожает.', mult: { gpu: 1.9, cpu: 1.1 }, days: 8 },
+    { name: 'Стриминговые войны', desc: 'Видеосервисы скупают хранилища.', mult: { sto: 1.6 }, days: 7 },
+    { name: 'Криптозима', desc: 'GPU никому не нужны, цены падают.', mult: { gpu: 0.55 }, days: 6 },
+    { name: 'Ценовая война облаков', desc: 'Гиганты демпингуют: все цены вниз.', mult: { cpu: 0.75, sto: 0.75, gpu: 0.8 }, days: 5 },
+    { name: 'Импортозамещение', desc: 'Госзаказчики переезжают: вычисления в цене.', mult: { cpu: 1.5 }, days: 8 },
+    { name: 'Дефицит видеокарт', desc: 'GPU-серверы стоят вдвое дороже, аренда GPU ×1,4.', mult: { gpu: 1.4 }, hw: { gpu: 2 }, days: 7 },
+    { name: 'Сезон распродаж', desc: 'Маркетплейсы под нагрузкой.', mult: { cpu: 1.35, sto: 1.2 }, days: 5 },
+    { name: 'Дешёвые диски', desc: 'Хранилища вдвое дешевле в закупке.', mult: { sto: 0.9 }, hw: { sto: 0.5 }, days: 6 },
+  ];
+  const BIDS = [0.75, 0.9, 1, 1.15];
+  const CERTS = [
+    { id: 'tier3', name: 'Tier III', price: 20000, desc: 'Резервирование питания. Контракты с SLA 99.9% платят на 20% больше.',
+      need: 'Во всех залах резерв ИБП/дизелей не меньше нагрузки',
+      ok: () => S.halls.every((H, i) => !H.open || hallStats(i).backup >= hallStats(i).load) },
+    { id: 'iso', name: 'ISO 27001', price: 45000, desc: 'Информационная безопасность. Все новые контракты +10%.',
+      need: 'Безопасник в штате и изучен Анти-DDoS',
+      ok: () => S.staff.guard >= 1 && hasTech('antiddos') },
+    { id: 'pci', name: 'PCI DSS', price: 60000, desc: 'Стандарт платёжных систем. Банки платят ×1,4 и приходят чаще.',
+      need: 'Два безопасника и сертификат ISO 27001',
+      ok: () => S.staff.guard >= 2 && certOn('iso') },
+    { id: 'green', name: 'Зелёный ЦОД', price: 90000, desc: 'ESG-клиенты: хранение и ИИ платят +20%.',
+      need: 'Солнечная станция и открытый Северный ЦОД',
+      ok: () => hasTech('solar') && S.halls[4].open },
+    { id: 'gov', name: 'Допуск к госзаказу', price: 200000, desc: 'В тендерах появляются госзаказы: объём ×1,5, цена ×1,5.',
+      need: 'Репутация от 60 и сертификат Tier III',
+      ok: () => S.rep >= 60 && certOn('tier3') },
+  ];
   const TARIFFS = [
     { name: 'Дёшево', pay: 0.8, flow: 1.7, rep: 1.3 },
     { name: 'Рынок', pay: 1, flow: 1, rep: 1 },
@@ -373,6 +389,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     eng: { name: 'Инженер-климатовик', pay: 300, desc: '+8% к охлаждению во всех залах за каждого.', max: 10 },
     guard: { name: 'Безопасник', pay: 250, desc: 'Тушит пожары за час и гасит DDoS на 15% за каждого.', max: 6 },
     sales: { name: 'Менеджер продаж', pay: 350, desc: '+1 предложение и +5% к оплате новых контрактов.', max: 5 },
+    buyer: { name: 'Завхоз', pay: 500, desc: 'Сам докупает серверы (и стойки рядом с кондиционерами), чтобы мощности хватало на все контракты с запасом. Правила задаются ниже.', max: 1 },
     acct: { name: 'Аккаунт-менеджер', pay: 450, desc: 'Сам подписывает контракты, на которые хватает свободной мощности (с запасом 10%). Самые выгодные — первыми.', max: 1 },
   };
   const KINDS = {
@@ -424,9 +441,11 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     { t: 'Поднимите репутацию до ★★★', ok: () => repLevel() >= 3, r: 6000 },
     { t: 'Изучите GPU-узлы и возьмите ИИ-контракт', ok: () => S.contracts.some((c) => c.type === 'gpu'), r: 12000 },
     { t: 'Арендуйте Машинный зал №1', ok: () => S.halls[2].open, r: 15000 },
+    { t: 'Выиграйте тендер у конкурентов', ok: () => S.stats.tenders >= 1, r: 20000 },
     { t: 'Держите 60 серверов', ok: () => countServers() >= 60, r: 30000 },
     { t: 'Заработайте $25 000 чистыми за день', ok: () => S.stats.bestDay >= 25000, r: 50000 },
     { t: 'Арендуйте Машинный зал №2', ok: () => S.halls[3].open, r: 80000 },
+    { t: 'Поглотите конкурента', ok: () => S.rivals.some((r) => r.bought), r: 100000 },
     { t: 'Поднимите репутацию до ★★★★★', ok: () => repLevel() >= 5, r: 150000 },
     { t: 'Откройте Северный ЦОД', ok: () => S.halls[4].open, r: 300000 },
     { t: 'Постройте Гиперскейл-кампус', ok: () => S.halls[5].open, r: 1000000, win: true },
@@ -442,20 +461,26 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     g[1 * 5 + 2] = { k: 'crac' };
     const st = {
       v: 1, day: 1, hour: 8, money: 3000, rep: 10, speed: 1, paused: false, started: false, over: false, won: false,
-      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0 }, jobs: [],
+      halls, tech: {}, research: null, staff: { admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0 }, jobs: [],
       contracts: [], offers: [], nextId: 1, event: null, nextEvent: 44, goal: 0,
-      stats: { signed: 0, done: 0, failed: 0, bestDay: 0 },
+      stats: { signed: 0, done: 0, failed: 0, bestDay: 0, tenders: 0 },
       today: { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 }, history: [], hourly: [],
       log: [], debtDays: 0, cur: 0, sel: null, tool: 'select', view: 'normal', tab: 'deals',
       cap: { cpu: 0, sto: 0, gpu: 0 }, dem: { cpu: 0, sto: 0, gpu: 0 }, peak: { cpu: 0, sto: 0, gpu: 0 }, served: { cpu: 1, sto: 1, gpu: 1 },
-      tariff: 1, loan: 0, equity: 0, capBonus: 0, promo: 0, msg: null, nextMsg: 14, lastMsg: -1,
-      autoPause: true, mode: window.THREE ? '3d' : '2d',
+      tariff: 1, loan: 0, equity: 0, capBonus: 0, promo: 0, msg: null, nextMsg: 20, lastMsg: -1, inbox: [], autoNo: false,
+      market: { cpu: 1, sto: 1, gpu: 1 }, mhist: [], trend: null, nextTrend: 96,
+      tender: null, nextTender: 60, tlog: [], subs: 0,
+      rivals: [{ name: 'ГигаХост', rep: 28, bought: false }, { name: 'Облако-24', rep: 42, bought: false }, { name: 'ООО «Сервер на балконе»', rep: 12, bought: false }],
+      policy: { headroom: 0.25, reserve: 5000, racks: true },
+      hw: { cpu: 1, sto: 1, gpu: 1 }, certs: {}, insured: false,
+      autoPause: true,
     };
     S = st;
     S.offers.push(genOffer(true), genOffer(), genOffer());
     return st;
   }
-  function mkRack(s = []) { return { k: 'rack', s, broken: 0, fire: 0, temp: 24, heat: 0, cool: 0 }; }
+  function mkRack(s = []) { return { k: 'rack', s, broken: 0, fire: 0, temp: 24, heat: 0, cool: 0, age: 0 }; }
+  const certOn = (id) => !!(S.certs[id] && S.certs[id].on);
 
   const repLevel = () => clamp(1 + Math.floor(S.rep / 20), 1, 5);
   const hasTech = (id) => !!S.tech[id];
@@ -510,6 +535,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   function genOffer(small) {
     const L = repLevel();
     const kinds = Object.keys(KINDS).filter((k) => (!KINDS[k].req || hasTech(KINDS[k].req)));
+    if (certOn('pci')) kinds.push('bank', 'bank');
     const kind = pick(kinds);
     const K = KINDS[kind];
     let lvl = small ? 1 : clamp(L + pick([-1, 0, 0, 0, 1]), 1, 5);
@@ -520,7 +546,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const crypto = S.event && S.event.type === 'crypto' && K.type === 'gpu' ? 2 : 1;
     const urgent = !small && Math.random() < 0.15;
     const pay = amount * TYPES[K.type].rate * SLA_MULT[sla] * rand(0.85, 1.25) * (1 + 0.05 * S.staff.sales) * (hasTech('peering') ? 1.15 : 1) * crypto
-      * TARIFFS[S.tariff].pay * (urgent ? 2.2 : 1);
+      * TARIFFS[S.tariff].pay * (urgent ? 2.2 : 1) * S.market[K.type] * certMult(kind, K.type, sla);
     return {
       id: S.nextId++, name: pick(CLIENTS[kind]), kind, type: K.type, amount, sla, lvl, urgent,
       pay: Math.max(1, Math.round(pay * 10) / 10),
@@ -528,7 +554,14 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       expires: urgent ? randi(12, 20) : randi(60, 110),
     };
   }
-  function contractPeak(c) { return c.amount; }
+  function certMult(kind, type, sla) {
+    let m = 1;
+    if (certOn('tier3') && sla >= 99.9) m *= 1.2;
+    if (certOn('iso')) m *= 1.1;
+    if (certOn('pci') && kind === 'bank') m *= 1.4;
+    if (certOn('green') && (type === 'sto' || type === 'gpu')) m *= 1.2;
+    return m;
+  }
 
   // ================= SIMULATION =================
   function rackCap(t, hallDark) {
@@ -630,8 +663,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         t.temp += (target - t.temp) * 0.5;
         if (H.dark || t.fire) return;
         if (t.k === 'miner') { if (t.temp > 44 && !t.fire && Math.random() < 0.04) { t.fire = 5; t.fireAge = 0; log(`ПОЖАР на ASIC-ферме, клетка ${tileName(hi, i)}!`, 'crit'); Sound.alarm(); alertPause('пожар'); } return; }
-        // failures
-        const p = fail * (t.temp > 32 ? 2.5 : 1) * (t.temp > 40 ? 4 : 1);
+        // failures (wear grows with age; engineers slow it down)
+        t.age = (t.age || 0) + 1 / (1 + 0.15 * S.staff.eng);
+        const p = fail * (t.temp > 32 ? 2.5 : 1) * (t.temp > 40 ? 4 : 1) * (1 + t.age / 480);
         const working = t.s.length - t.broken;
         for (let n = 0; n < working; n++) if (Math.random() < p) t.broken++;
         if (t.broken > 0 && t.broken > (t.lastBroken || 0)) log(`Сломался сервер в ${HALLS[hi].name}, стойка ${tileName(hi, i)}`, 'warn');
@@ -658,6 +692,11 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         }
         if (t.fire <= 0) {
           const lost = t.s.length;
+          if (S.insured && lost) {
+            const pay = Math.round(t.s.reduce((a, m) => a + priceOf(m), 0) * 0.8);
+            S.money += pay; S.today.other -= pay;
+            log(`Страховая выплатила ${fmt$(pay)} за сгоревшую стойку`, 'good');
+          }
           t.s = []; t.broken = 0; t.lastBroken = 0; t.fire = 0; t.temp = amb + 20;
           log(`Стойка ${tileName(hi, i)} сгорела: потеряно серверов ${lost}`, 'crit');
           Sound.crash();
@@ -685,7 +724,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         log(`Контракт «${c.name}» выполнен (${up.toFixed(2)}%). Бонус ${fmt$(bonus)}`, 'good');
         Sound.coin();
       } else {
-        const fine = Math.round(c.pay * 12);
+        const fine = Math.round(c.pay * 12 * (S.insured ? 0.5 : 1));
         S.money -= fine; S.today.other += fine;
         S.rep = Math.max(0, S.rep - 4 - c.lvl * 2);
         S.stats.failed++;
@@ -694,6 +733,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       }
     });
     income *= 1 - S.equity;
+    income += S.subs;
     S.halls.forEach((H) => { if (H.open && !H.dark) H.grid.forEach((t) => { if (t && t.k === 'miner' && !t.fire) income += 30; }); });
     // expenses: electricity
     let kw = 0;
@@ -717,24 +757,23 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     if (S.offers.length < want && Math.random() < flow) S.offers.push(genOffer());
     if (S.promo > 0) S.promo--;
     if (S.staff.acct > 0) autoSign();
+    if (S.staff.buyer > 0 && S.hour % 3 === 0) autoBuy();
+    marketTick();
+    tenderTick();
 
     // mail
-    if (S.msg) {
-      if (--S.msg.left <= 0) {
-        const m = MSGS[S.msg.i], d = S.msg.data;
-        S.msg = null;
-        log(`${m.from}: ответа не дождались`);
-        m.no[1](d);
-      }
-    } else if (--S.nextMsg <= 0) {
-      const ok = MSGS.map((m, i) => i).filter((i) => i !== S.lastMsg && (!MSGS[i].cond || MSGS[i].cond()));
-      if (ok.length) {
+    S.inbox.forEach((m) => { m.left--; });
+    S.inbox.filter((m) => m.left <= 0).forEach((m) => answerMail(m, 'no', true));
+    if (--S.nextMsg <= 0) {
+      const ok = MSGS.map((m, i) => i).filter((i) => i !== S.lastMsg && !S.inbox.some((m) => m.i === i) && (!MSGS[i].cond || MSGS[i].cond()));
+      if (ok.length && S.inbox.length < 3) {
         const i = pick(ok);
-        S.msg = { i, left: 10, data: MSGS[i].init ? MSGS[i].init() : {} };
+        const m = { id: S.nextId++, i, left: 30, data: MSGS[i].init ? MSGS[i].init() : {} };
         S.lastMsg = i;
-        Sound.coin();
+        if (S.autoNo) answerMail(m, 'no', true);
+        else { S.inbox.push(m); toast(`Новое письмо: ${MSGS[i].from}`); Sound.coin(); }
       }
-      S.nextMsg = randi(16, 30);
+      S.nextMsg = randi(28, 52);
     }
 
     // research
@@ -814,6 +853,15 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const sal = Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0);
     const rent = HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0);
     const interest = Math.round(S.loan * 0.012);
+    const premium = S.insured ? insurancePremium() : 0;
+    if (premium) { S.money -= premium; S.today.other += premium; }
+    CERTS.forEach((c) => {
+      const st = S.certs[c.id];
+      if (!st) return;
+      const ok = c.ok();
+      if (st.on && !ok) { st.on = false; log(`Сертификат ${c.name} приостановлен: ${c.need.toLowerCase()}`, 'crit'); Sound.bad(); }
+      else if (!st.on && ok) { st.on = true; log(`Сертификат ${c.name} восстановлен`, 'good'); }
+    });
     S.money -= sal + rent + interest;
     S.today.sal += sal; S.today.rent += rent; S.today.other += interest;
     if (interest) log(`Проценты по кредиту: ${fmt$(interest)}`);
@@ -822,6 +870,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     S.history.push({ inc: Math.round(d.inc), exp: Math.round(d.elec + d.sal + d.rent + d.other), net: Math.round(net) });
     if (S.history.length > 30) S.history.shift();
     S.stats.bestDay = Math.max(S.stats.bestDay, net);
+    S.rivals.forEach((r) => { if (!r.bought) r.rep = Math.min(95, r.rep + rand(0, 0.7)); });
+    S.mhist.push({ ...S.market });
+    if (S.mhist.length > 30) S.mhist.shift();
     S.today = { inc: 0, elec: 0, sal: 0, rent: 0, other: 0 };
     log(`День ${S.day}. Вчера: ${net >= 0 ? 'прибыль' : 'убыток'} ${fmt$(net)}`, net >= 0 ? '' : 'warn');
     if (S.money < 0) {
@@ -857,6 +908,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       S.paused = true;
       toast(`Автопауза: ${what}. Продолжить — ▶ или пробел`, 'bad');
     }
+  }
+  function insurancePremium() {
+    const eq = S.halls.reduce((a, H) => a + H.grid.reduce((b, t) => b + (t ? refund(t) * 2 : 0), 0), 0);
+    return Math.round(eq * 0.004);
   }
   function valuation() {
     const assets = S.halls.reduce((a, H) => a + H.grid.reduce((b, t) => b + (t ? refund(t) * 2 : 0), 0), 0);
@@ -996,6 +1051,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     },
     {
       from: 'Пожарная инспекция',
+      def: 'yes',
       text: () => 'Внеплановая проверка. Проходим честно или «решим вопрос» за $500?',
       yes: ['Честно', () => {
         const hot = allRacks((t) => t.temp > 40 || t.fire).length > 0;
@@ -1049,6 +1105,185 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     });
   }
 
+  // ----- market -----
+  const hwMult = (type) => S.hw[type];
+  const priceOf = (m) => Math.round(MODELS[m].price * hwMult(MODELS[m].type));
+  const sellOf = (m) => Math.round(priceOf(m) * 0.5);
+  function bumpHw(m, n = 1) { const t = MODELS[m].type; S.hw[t] = Math.min(2.5, S.hw[t] + 0.004 * MODELS[m].tier * n); }
+  function marketTick() {
+    for (const k of ['cpu', 'sto', 'gpu']) {
+      const tgt = (S.trend && S.trend.mult[k]) || 1;
+      S.market[k] = clamp(S.market[k] + (tgt - S.market[k]) * 0.03 + rand(-0.008, 0.008), 0.4, 2.5);
+      const hwT = (0.65 + 0.35 * S.market[k]) * ((S.trend && S.trend.hw && S.trend.hw[k]) || 1);
+      S.hw[k] = clamp(S.hw[k] + (hwT - S.hw[k]) * 0.02 + rand(-0.005, 0.005), 0.4, 2.5);
+    }
+    if (S.trend) {
+      if (--S.trend.left <= 0) { log(`Рынок: «${S.trend.name}» закончился`); S.trend = null; }
+    } else if (--S.nextTrend <= 0) {
+      const T = pick(TRENDS);
+      S.trend = { ...T, left: T.days * 24 };
+      log(`Рынок: ${T.name}. ${T.desc}`, 'warn');
+      toast(`Рынок: ${T.name}`);
+      S.nextTrend = randi(5, 9) * 24;
+    }
+  }
+
+  // ----- tenders & rivals -----
+  function tenderTick() {
+    const T = S.tender;
+    if (T) {
+      if (--T.left <= 0) resolveTender();
+    } else if (--S.nextTender <= 0) {
+      const L = repLevel();
+      const lvl = Math.min(5, L + 1);
+      const kinds = Object.keys(KINDS).filter((k) => !KINDS[k].req || hasTech(KINDS[k].req));
+      const kind = pick(kinds), type = KINDS[kind].type;
+      const gov = certOn('gov') && Math.random() < 0.5;
+      const amount = Math.round(AMT[type][lvl - 1][1] * rand(0.8, 1.4) * (gov ? 1.5 : 1));
+      const sla = gov ? 99.9 : pick([99, 99, 99.9]);
+      const base = Math.round(amount * TYPES[type].rate * SLA_MULT[sla] * S.market[type] * 1.15 * (gov ? 1.5 : 1) * certMult(kind, type, sla) * 10) / 10;
+      const name = gov ? pick(['Госуслуги Тридевятого царства', 'Минцифры Лукоморья', 'Электронный архив Кощеева ведомства']) : pick(CLIENTS[kind]);
+      S.tender = { id: S.nextId++, name, kind, type, amount, sla, lvl, base, days: randi(20, 30) + (gov ? 10 : 0), left: 36, bid: null, gov };
+      log(`Объявлен тендер: «${S.tender.name}», ${fmtN(amount)} ${TYPES[type].unit} на ${S.tender.days} дн.`, 'warn');
+      toast('Новый тендер! Вкладка «Тендеры»');
+      S.nextTender = randi(80, 130);
+    }
+  }
+  const scoreOf = (bid, rep) => bid / (0.6 + rep / 125);
+  function resolveTender() {
+    const T = S.tender;
+    S.tender = null;
+    const field = S.rivals.filter((r) => !r.bought).map((r) => ({ name: r.name, r, bid: rand(0.8, 1.15) }));
+    field.forEach((f) => { f.score = scoreOf(f.bid, f.r.rep); });
+    if (T.bid) field.push({ name: 'Вы', me: true, bid: T.bid, score: scoreOf(T.bid, S.rep) });
+    if (!field.length) return;
+    field.sort((a, b) => a.score - b.score);
+    const win = field[0];
+    if (win.me) {
+      const pay = Math.round(T.base * T.bid * 10) / 10;
+      S.contracts.push({ id: S.nextId++, name: T.name, kind: T.kind, type: T.type, amount: T.amount, sla: T.sla, lvl: T.lvl, pay, days: T.days, left: T.days * 24, ok: 0, hrs: 0, tender: true });
+      S.stats.tenders++; S.stats.signed++;
+      S.rep = Math.min(100, S.rep + 3);
+      log(`Тендер выигран: «${T.name}» на ${T.days} дн., ${fmt$(pay)}/ч. Готовьте мощности!`, 'good');
+      toast('Тендер выигран!', 'good');
+      Sound.win();
+    } else {
+      win.r.rep = Math.min(95, win.r.rep + 2);
+      log(`Тендер «${T.name}» выиграл ${win.name}${T.bid ? '' : ' (вы не участвовали)'}`, T.bid ? 'warn' : '');
+    }
+    S.tlog.unshift({ name: T.name, winner: win.name, me: !!win.me });
+    S.tlog.length = Math.min(S.tlog.length, 5);
+  }
+  const rivalPrice = (r) => Math.round((40000 + r.rep * r.rep * 140) / 1000) * 1000;
+
+  // ----- procurement -----
+  function bestModel(type) {
+    return Object.keys(MODELS).filter((k) => MODELS[k].type === type && (!MODELS[k].req || hasTech(MODELS[k].req))).sort((a, b) => MODELS[b].cap - MODELS[a].cap)[0];
+  }
+  function findSlot(kw) {
+    let best = null;
+    S.halls.forEach((H, hi) => {
+      if (!H.open || H.dark) return;
+      const st = hallStats(hi);
+      if (st.load + kw > st.cap) return;
+      H.grid.forEach((t, i) => {
+        if (!t || t.k !== 'rack' || t.fire || t.s.length >= RACK_SLOTS || t.temp > 34) return;
+        if (!best || t.temp < best.t.temp) best = { hi, i, t };
+      });
+    });
+    return best;
+  }
+  function findRackSpot(kw) {
+    let best = null;
+    S.halls.forEach((H, hi) => {
+      if (!H.open) return;
+      const D = HALLS[hi];
+      const st = hallStats(hi);
+      if (st.load + kw > st.cap) return;
+      H.grid.forEach((t, i) => {
+        if (t) return;
+        const x = i % D.w, y = Math.floor(i / D.w);
+        let score = 0;
+        H.grid.forEach((c, j) => {
+          const b = c && BUILD[c.k];
+          if (!b || !b.cool) return;
+          const cx = j % D.w, cy = Math.floor(j / D.w);
+          if (Math.max(Math.abs(cx - x), Math.abs(cy - y)) > b.r) return;
+          let n = 1;
+          H.grid.forEach((r, k) => { if (r && (r.k === 'rack' || r.k === 'miner') && Math.max(Math.abs((k % D.w) - cx), Math.abs(Math.floor(k / D.w) - cy)) <= b.r) n++; });
+          score += b.cool / n;
+        });
+        if (score >= 12 && (!best || score > best.score)) best = { hi, i, score };
+      });
+    });
+    return best && [best.hi, best.i];
+  }
+  let buyerWarned = 0;
+  function autoBuy() {
+    const P = S.policy;
+    let bought = 0, racks = 0, blocked = false;
+    for (const type of ['cpu', 'sto', 'gpu']) {
+      if (!S.peak[type]) continue;
+      const m = bestModel(type);
+      if (!m) continue;
+      const M = MODELS[m];
+      let need = S.peak[type] * (1 + P.headroom) - S.cap[type];
+      while (need > 0 && bought < 10) {
+        const price = priceOf(m);
+        if (S.money - price < P.reserve) break;
+        let slot = findSlot(M.kw);
+        if (!slot && P.racks) {
+          const sp = findRackSpot(M.kw);
+          if (sp && S.money - price - BUILD.rack.price >= P.reserve) {
+            S.halls[sp[0]].grid[sp[1]] = mkRack();
+            S.money -= BUILD.rack.price; S.today.other += BUILD.rack.price;
+            racks++;
+            slot = { hi: sp[0], i: sp[1], t: S.halls[sp[0]].grid[sp[1]] };
+          }
+        }
+        if (!slot) { blocked = true; break; }
+        slot.t.s.splice(slot.t.s.length - slot.t.broken, 0, m);
+        S.money -= price; S.today.other += price;
+        bumpHw(m);
+        refreshHall(slot.hi);
+        need -= M.cap * techMult(type);
+        bought++;
+      }
+    }
+    if (bought) log(`Завхоз докупил серверов: ${bought}${racks ? `, поставил стоек: ${racks}` : ''}`);
+    if (blocked && S.day > buyerWarned) { buyerWarned = S.day; log('Завхоз: некуда ставить серверы — нужны кондиционеры, трансформаторы или новый зал', 'warn'); }
+  }
+
+  // ----- mail -----
+  function answerMail(m, a, silent) {
+    S.inbox = S.inbox.filter((x) => x !== m);
+    const M = MSGS[m.i];
+    if (silent) a = M.def || 'no';
+    log(silent ? `${M.from}: без ответа (${M[a][0].toLowerCase()})` : `Вы → ${M.from}: «${M[a][0]}»`);
+    M[a][1](m.data);
+  }
+
+  // ----- bulk -----
+  function hallServerCount(hi, model) {
+    return S.halls[hi].grid.reduce((a, t) => a + (t && t.k === 'rack' ? t.s.filter((x) => x === model).length : 0), 0);
+  }
+  function fillRacks(list, hi, m) {
+    let n = 0;
+    const M = MODELS[m];
+    for (const t of list) {
+      while (t.s.length < RACK_SLOTS) {
+        const st = hallStats(hi);
+        if (st.load + M.kw > st.cap) { if (!n) toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); return n; }
+        if (S.money < priceOf(m)) { if (!n) toast('Не хватает денег', 'bad'); return n; }
+        S.money -= priceOf(m); S.today.other += priceOf(m);
+        bumpHw(m);
+        t.s.splice(t.s.length - t.broken, 0, m);
+        n++;
+      }
+    }
+    return n;
+  }
+
   // ================= ACTIONS =================
   function spend(v) {
     if (S.money < v) { toast(`Не хватает денег: нужно ${fmt$(v)}`, 'bad'); Sound.bad(); return false; }
@@ -1074,7 +1309,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   function refreshHall(h) { const st = hallStats(h); Object.assign(S.halls[h], { load: st.load, cap: st.cap, backup: st.backup }); }
 
   function refund(t) {
-    if (t.k === 'rack') return BUILD.rack.price * 0.5 + t.s.reduce((a, m) => a + MODELS[m].price * 0.5, 0);
+    if (t.k === 'rack') return BUILD.rack.price * 0.5 + t.s.reduce((a, m) => a + sellOf(m), 0);
     return BUILD[t.k].price * 0.5;
   }
 
@@ -1091,15 +1326,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     keep() { $('#overlay').hidden = true; S.paused = false; },
     tool(a) { S.tool = S.tool === a ? 'select' : a; },
     view(a) { S.view = a; },
-    mode(a) { S.mode = a === '3d' && G3.ok ? '3d' : '2d'; layoutCanvas(); },
     autopause() { S.autoPause = !S.autoPause; showOverlay('menu'); },
-    answer(a) {
-      if (!S.msg) return;
-      const m = MSGS[S.msg.i], d = S.msg.data;
-      S.msg = null;
-      log(`Вы → ${m.from}: «${m[a][0]}»`);
-      m[a][1](d);
-    },
     tariff(a) { S.tariff = Number(a); log(`Тарифы: ${TARIFFS[S.tariff].name}. Новые предложения пойдут по новым ценам`); },
     loan(a) {
       const v = Number(a);
@@ -1132,16 +1359,106 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       if (!t || t.k !== 'rack' || t.s.length >= RACK_SLOTS) return;
       const st = hallStats(S.sel.h);
       if (st.load + m.kw > st.cap) { toast('Не хватает мощности зала. Поставьте трансформатор', 'bad'); Sound.bad(); return; }
-      if (!spend(m.price)) return;
+      if (!spend(priceOf(a))) return;
+      bumpHw(a);
       t.s.splice(t.s.length - t.broken, 0, a);
       Sound.build();
       refreshHall(S.sel.h);
     },
+    fillrack(a) {
+      const t = selTile();
+      if (!t || t.k !== 'rack') return;
+      const n = fillRacks([t], S.sel.h, a);
+      if (n) { Sound.build(); refreshHall(S.sel.h); }
+    },
+    fillhall(a) {
+      const list = S.halls[S.cur].grid.filter((t) => t && t.k === 'rack' && !t.fire);
+      const n = fillRacks(list, S.cur, a);
+      if (n) { Sound.build(); refreshHall(S.cur); log(`Зал заполнен: +${n} × ${MODELS[a].name}`); }
+    },
+    upghall(a) {
+      const [from, to] = a.split('>');
+      const cost = priceOf(to) - sellOf(from);
+      let n = 0;
+      for (const t of S.halls[S.cur].grid) {
+        if (!t || t.k !== 'rack') continue;
+        for (let k = 0; k < t.s.length - t.broken; k++) {
+          if (t.s[k] !== from) continue;
+          const st = hallStats(S.cur);
+          if (st.load - MODELS[from].kw + MODELS[to].kw > st.cap || S.money < cost) break;
+          S.money -= cost; S.today.other += cost;
+          bumpHw(to);
+          t.s[k] = to; n++;
+        }
+      }
+      refreshHall(S.cur);
+      if (n) { Sound.build(); log(`Модернизация: ${n} × ${MODELS[from].name} → ${MODELS[to].name}`, 'good'); }
+      else toast('Не хватает денег или мощности', 'bad');
+    },
+    maintain() {
+      const racks = S.halls[S.cur].grid.filter((t) => t && t.k === 'rack');
+      const cost = racks.reduce((a, t) => a + t.s.length, 0) * 40;
+      if (!spend(cost)) return;
+      racks.forEach((t) => { t.age = 0; });
+      log(`Профилактика в зале «${HALLS[S.cur].name}»: износ сброшен`, 'good');
+      Sound.coin();
+    },
+    cert(a) {
+      const c = CERTS.find((x) => x.id === a);
+      if (!c || S.certs[a]) return;
+      if (!c.ok()) { toast(`Не выполнено: ${c.need}`, 'bad'); return; }
+      if (!spend(c.price)) return;
+      S.certs[a] = { on: true };
+      log(`Получен сертификат ${c.name}`, 'good');
+      Sound.win();
+    },
+    insure() { S.insured = !S.insured; log(S.insured ? 'Оборудование застраховано' : 'Страховка отменена'); },
+    promoBuy() {
+      const cost = 1000 * repLevel();
+      if (S.promo) return;
+      if (!spend(cost)) return;
+      S.promo = 48;
+      log(`Рекламная кампания на двое суток за ${fmt$(cost)}`, 'good');
+    },
+    repairhall() {
+      let n = 0;
+      for (const t of S.halls[S.cur].grid) {
+        if (!t || t.k !== 'rack' || !t.broken) continue;
+        const cost = t.s.slice(t.s.length - t.broken).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
+        if (S.money < cost) break;
+        S.money -= cost; S.today.other += cost;
+        n += t.broken; t.broken = 0; t.lastBroken = 0;
+      }
+      if (n) { Sound.coin(); log(`Починено серверов: ${n}`, 'good'); }
+    },
+    bid(a) { if (S.tender) S.tender.bid = a === 'off' ? null : Number(a); },
+    buyrival(a) {
+      const r = S.rivals[Number(a)];
+      if (!r || r.bought) return;
+      const price = rivalPrice(r);
+      if (!spend(price)) return;
+      r.bought = true;
+      const inc = Math.round((price / (24 * 25)) * 10) / 10;
+      S.subs += inc;
+      S.rep = Math.min(100, S.rep + 5);
+      log(`Поглощена компания ${r.name}. Её клиенты приносят ${fmt$(inc)}/ч`, 'good');
+      Sound.win();
+    },
+    policy(a) {
+      const [k, v] = a.split(':');
+      S.policy[k] = k === 'racks' ? v === '1' : Number(v);
+    },
+    mailans(a) {
+      const [id, ans] = a.split(':');
+      const m = S.inbox.find((x) => x.id === Number(id));
+      if (m) answerMail(m, ans);
+    },
+    autono() { S.autoNo = !S.autoNo; if (S.autoNo) [...S.inbox].forEach((m) => answerMail(m, 'no', true)); },
     sellsrv(a) {
       const t = selTile(); const n = Number(a);
       if (!t || !t.s[n]) return;
       const isBroken = n >= t.s.length - t.broken;
-      const back = MODELS[t.s[n]].price * (isBroken ? 0.1 : 0.5);
+      const back = isBroken ? Math.round(priceOf(t.s[n]) * 0.1) : sellOf(t.s[n]);
       t.s.splice(n, 1);
       if (isBroken) t.broken--;
       S.money += back;
@@ -1263,21 +1580,15 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       setHTML('#lockcard', `<h3>${D.name}</h3><p>${D.w}×${D.h} клеток, ${D.kw} кВт, воздух ${D.amb} °C</p><p>Требуется репутация ${'★'.repeat(D.lvl)}${can ? '' : ' (пока не хватает)'}</p><div><button class="btn primary" type="button" data-act="openhall" data-a="${S.cur}" ${can && S.money >= D.price ? '' : 'disabled'}>Арендовать за ${fmt$(D.price)}</button></div>`);
     } else lock.hidden = true;
 
-    // mail
-    const mail = $('#mail');
-    if (S.msg && S.started) {
-      const m = MSGS[S.msg.i];
-      mail.hidden = false;
-      if (!pressing) setHTML('#mail', `<div class="who">${m.from}<span>ответить за ${S.msg.left} ч</span></div><p>${m.text(S.msg.data)}</p><div class="opts"><button class="btn primary" type="button" data-act="answer" data-a="yes">${m.yes[0]}</button><button class="btn" type="button" data-act="answer" data-a="no">${m.no[0]}</button></div>`);
-    } else mail.hidden = true;
 
     // tools
     const tools = [['select', 'Выбор', 'осмотр'], ...Object.keys(BUILD).filter((k) => !BUILD[k].hidden).map((k) => [k, BUILD[k].name, `${fmt$(BUILD[k].price)} · ${BUILD[k].short}`, BUILD[k].req]), ['demolish', 'Снести', 'возврат 50%']];
     setHTML('#tools', tools.map(([k, n, s, req]) => `<button class="btn" type="button" data-act="tool" data-a="${k}" aria-pressed="${S.tool === k}" ${req && !hasTech(req) ? 'disabled title="Нужно исследование"' : ''}>${n}<small>${s}</small></button>`).join('') +
-      `<span class="sep"></span><div class="seg" role="group" aria-label="Вид"><button type="button" data-act="mode" data-a="3d" aria-pressed="${S.mode === '3d'}" ${G3.ok ? '' : 'disabled'}>3D</button><button type="button" data-act="mode" data-a="2d" aria-pressed="${S.mode !== '3d'}">План</button></div><div class="seg" role="group" aria-label="Слой">${[['normal', 'Обычный'], ['heat', 'Тепло'], ['power', 'Питание']].map(([k, n]) => `<button type="button" data-act="view" data-a="${k}" aria-pressed="${S.view === k}">${n}</button>`).join('')}</div>`);
+      `<span class="sep"></span><div class="seg" role="group" aria-label="Слой">${[['normal', 'Обычный'], ['heat', 'Тепло'], ['power', 'Питание']].map(([k, n]) => `<button type="button" data-act="view" data-a="${k}" aria-pressed="${S.view === k}">${n}</button>`).join('')}</div>`);
 
     // tabs
-    const tabs = [['obj', 'Объект'], ['deals', `Контракты<sup>${S.offers.length}</sup>`], ['staff', 'Персонал'], ['tech', 'Наука'], ['fin', 'Финансы'], ['goals', 'Цели']];
+    const tabs = [['obj', 'Объект'], ['deals', `Контракты<sup>${S.offers.length}</sup>`], ['tender', `Тендеры${S.tender && !S.tender.bid ? '<sup>!</sup>' : ''}`], ['mail', `Почта${S.inbox.length ? `<sup>${S.inbox.length}</sup>` : ''}`],
+      ['staff', 'Персонал'], ['tech', 'Развитие'], ['fin', 'Финансы'], ['goals', 'Цели']];
     setHTML('#tabs', tabs.map(([k, n]) => `<button type="button" data-act="tab" data-a="${k}" aria-pressed="${S.tab === k}">${n}</button>`).join(''));
     if (!pressing) setHTML('#tab', TAB[S.tab]());
 
@@ -1292,10 +1603,54 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     return `<div class="cap"><span>${TYPES[k].name}</span><div class="meter"><i style="width:${pct}%;background:${col}"></i></div><span>${fmtN(d)} / ${fmtN(c)}</span></div>`;
   };
 
+  function marketHtml() {
+    const spark = (k) => {
+      const pts = S.mhist.map((m) => m[k]).concat([S.market[k]]);
+      if (pts.length < 2) return '';
+      const W = 100, H = 26;
+      const path = pts.map((v, n) => `${(n / (pts.length - 1)) * W},${H - ((v - 0.4) / 2.1) * H}`).join(' ');
+      return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${W}" y1="${H - (0.6 / 2.1) * H}" y2="${H - (0.6 / 2.1) * H}" stroke="#26313c"/><polyline points="${path}" fill="none" stroke="#6cb4ff" stroke-width="1.5"/></svg>`;
+    };
+    const cell = (k) => {
+      const v = S.market[k], hw = hwMult(k);
+      return `<div><span class="meta">${TYPES[k].name}</span><b class="${v > 1.05 ? 'up' : v < 0.95 ? 'down' : ''}">×${v.toFixed(2).replace('.', ',')}</b>${spark(k)}<span class="meta ${hw > 1.05 ? 'warn' : hw < 0.95 ? 'ok' : ''}">железо ×${hw.toFixed(2).replace('.', ',')}</span></div>`;
+    };
+    const tr = S.trend ? `<p class="muted"><b class="warn">${S.trend.name}</b> — ${S.trend.desc} Ещё ${Math.ceil(S.trend.left / 24)} дн.</p>` : '<p class="muted">Рынок спокоен. Индекс умножает оплату новых контрактов. Цена железа идёт за спросом, а ваши крупные закупки её разгоняют.</p>';
+    return `<h3>Рынок</h3><div class="mkt">${['cpu', 'sto', 'gpu'].map(cell).join('')}</div>${tr}`;
+  }
+  const wearText = (t) => `${Math.round((t.age || 0) / 24)} дн. · поломки ×${(1 + (t.age || 0) / 480).toFixed(1).replace('.', ',')}`;
+  function hallPanel() {
+    const hi = S.cur, H = S.halls[hi];
+    if (!H.open) return '<h3>Зал не арендован</h3><p class="muted">Арендуйте зал, чтобы строить.</p>';
+    const racks = H.grid.filter((t) => t && t.k === 'rack');
+    const free = racks.reduce((a, t) => a + RACK_SLOTS - t.s.length, 0);
+    const broken = racks.reduce((a, t) => a + t.broken, 0);
+    const models = Object.keys(MODELS).filter((k) => !MODELS[k].req || hasTech(MODELS[k].req));
+    const fill = free ? models.map((k) => `<button class="btn" type="button" data-act="fillhall" data-a="${k}" ${S.money < priceOf(k) ? 'disabled' : ''}><span>${MODELS[k].name} ${typeTag(MODELS[k].type)}<small>до ${free} шт. · по ${fmt$(priceOf(k))}</small></span><span class="price">${fmt$(priceOf(k) * free)}</span></button>`).join('') : '<p class="muted">Свободных слотов нет. Поставьте стойки.</p>';
+    const ups = [];
+    models.forEach((from) => models.forEach((to) => {
+      if (MODELS[from].type !== MODELS[to].type || MODELS[to].cap <= MODELS[from].cap) return;
+      const n = hallServerCount(hi, from);
+      if (!n) return;
+      const cost = priceOf(to) - sellOf(from);
+      ups.push(`<button class="btn" type="button" data-act="upghall" data-a="${from}>${to}" ${S.money < cost ? 'disabled' : ''}><span>${n} × ${MODELS[from].name} → ${MODELS[to].name}<small>по ${fmt$(cost)} с учётом сдачи старых</small></span><span class="price">${fmt$(cost * n)}</span></button>`);
+    }));
+    const repCost = racks.reduce((a, t) => a + t.s.slice(t.s.length - t.broken).reduce((b, m) => b + 80 * MODELS[m].tier, 0), 0);
+    const nSrv = racks.reduce((a, t) => a + t.s.length, 0);
+    const avgAge = racks.length ? racks.reduce((a, t) => a + (t.age || 0), 0) / racks.length : 0;
+    const mntCost = nSrv * 40;
+    return `<h3>${HALLS[hi].name}: массовые действия</h3>
+      <p class="muted">Строить можно «кистью»: выберите инструмент и протяните мышью или пальцем по клеткам. Нажмите на клетку, чтобы открыть её.</p>
+      ${broken ? `<button class="btn primary" type="button" data-act="repairhall" ${S.money < repCost ? 'disabled' : ''}>Починить все сломанные (${broken}) · ${fmt$(repCost)}</button>` : ''}
+      ${nSrv ? `<button class="btn" type="button" data-act="maintain" ${S.money < mntCost ? 'disabled' : ''}><span>Профилактика всего зала<small>Средний износ ${Math.round(avgAge / 24)} дн. · поломки ×${(1 + avgAge / 480).toFixed(1).replace('.', ',')} → ×1,0</small></span><span class="price">${fmt$(mntCost)}</span></button>` : ''}
+      <h3>Заполнить все стойки зала</h3><div class="shop">${fill}</div>
+      ${ups.length ? `<h3>Модернизация</h3><div class="shop">${ups.join('')}</div>` : ''}
+      <dl class="kv"><dt>Перегрев</dt><dd class="warn">от 32 °C, мощность −15%</dd><dt>Критично</dt><dd class="crit">от 40 °C, поломки ×10</dd><dt>Пожар</dt><dd class="crit">от 44 °C</dd></dl>`;
+  }
+
   const TAB = {
     obj() {
-      if (!S.sel) return `<h3>Объект</h3><p class="muted">Нажмите на клетку зала. Чтобы строить, выберите инструмент под планом и нажимайте на пустые клетки.</p>
-        <dl class="kv"><dt>Перегрев</dt><dd class="warn">от 32 °C, мощность −15%</dd><dt>Критично</dt><dd class="crit">от 40 °C, поломки ×10</dd><dt>Пожар</dt><dd class="crit">от 44 °C</dd></dl>`;
+      if (!S.sel) return hallPanel();
       const { h, i } = S.sel;
       const t = S.halls[h].grid[i];
       const where = `${HALLS[h].name} · клетка ${tileName(h, i)}`;
@@ -1310,13 +1665,13 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         const working = t.s.length - t.broken;
         const repairCost = t.s.slice(working).reduce((a, m) => a + 80 * MODELS[m].tier, 0);
         const fire = t.fire ? `<button class="btn hot" type="button" data-act="extinguish">ТУШИТЬ ПОЖАР</button>` : '';
-        const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${MODELS[m].cap} ${TYPES[MODELS[m].type].unit}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать</button></div>`).join('');
+        const slots = t.s.map((m, n) => `<div class="slot ${n >= working ? 'bad' : ''}"><span>${MODELS[m].name} · ${MODELS[m].cap} ${TYPES[MODELS[m].type].unit}${n >= working ? ' · сломан' : ''}</span><button class="btn sm" type="button" data-act="sellsrv" data-a="${n}">Продать · ${fmt$(n >= working ? priceOf(m) * 0.1 : sellOf(m))}</button></div>`).join('');
         const shop = t.s.length < RACK_SLOTS ? `<h3>Добавить сервер (${t.s.length}/${RACK_SLOTS})</h3><div class="shop">${Object.keys(MODELS).filter((k) => !MODELS[k].req || hasTech(MODELS[k].req)).map((k) => {
-          const m = MODELS[k];
-          return `<button class="btn" type="button" data-act="addsrv" data-a="${k}" ${S.money < m.price ? 'disabled' : ''}><span>${m.name} ${typeTag(m.type)}<small>${m.cap} ${TYPES[m.type].unit} · тепло ${m.heat} · ${m.kw} кВт</small></span><span class="price">${fmt$(m.price)}</span></button>`;
+          const m = MODELS[k], free = RACK_SLOTS - t.s.length, pr = priceOf(k);
+          return `<div class="row"><button class="btn" type="button" data-act="addsrv" data-a="${k}" ${S.money < pr ? 'disabled' : ''} style="flex:1"><span>${m.name} ${typeTag(m.type)}<small>${m.cap} ${TYPES[m.type].unit} · тепло ${m.heat} · ${m.kw} кВт</small></span><span class="price">${fmt$(pr)}</span></button>${free > 1 ? `<button class="btn sm" type="button" data-act="fillrack" data-a="${k}" ${S.money < pr ? 'disabled' : ''}>×${free}</button>` : ''}</div>`;
         }).join('')}</div>` : '<p class="muted">Стойка заполнена.</p>';
         return `<h3>${where}</h3><p class="ttl">Стойка</p>${fire}
-          <dl class="kv"><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
+          <dl class="kv"><dt>Износ</dt><dd class="${(t.age || 0) > 480 ? 'warn' : ''}">${wearText(t)}</dd><dt>Температура</dt><dd class="${tc}">${t.temp.toFixed(1)} °C</dd><dt>Тепло / охлаждение</dt><dd class="${t.heat > t.cool ? 'crit' : ''}">${t.heat.toFixed(0)} / ${t.cool.toFixed(0)}</dd><dt>Сломано</dt><dd class="${t.broken ? 'crit' : ''}">${t.broken}</dd></dl>
           ${t.broken ? `<button class="btn primary" type="button" data-act="repair" ${S.money < repairCost ? 'disabled' : ''}>Починить сейчас · ${fmt$(repairCost)}</button>${S.staff.admin ? '<p class="muted">Админ уже в пути, можно подождать бесплатно.</p>' : '<p class="muted">Наймите админа, и он будет чинить сам.</p>'}` : ''}
           <div class="slots">${slots || '<p class="muted">Пустая стойка.</p>'}</div>${shop}
           <button class="btn danger" type="button" data-act="demolish">Демонтировать стойку · +${fmt$(refund(t))}</button>`;
@@ -1343,7 +1698,9 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       }).join('');
       const acct = S.staff.acct ? '<p class="muted ok">Аккаунт-менеджер сам подписывает контракты, если хватает мощности.</p>' : '<p class="muted">Нет времени выбирать? Наймите аккаунт-менеджера во вкладке «Персонал» — он будет подписывать сам.</p>';
       return `<h3>Тарифы</h3><div class="seg" role="group" aria-label="Тарифы">${TARIFFS.map((t, n) => `<button type="button" data-act="tariff" data-a="${n}" aria-pressed="${S.tariff === n}">${t.name}</button>`).join('')}</div>
-        <p class="muted">Дёшево — больше клиентов и репутации, но ниже оплата. Дорого — наоборот.${S.promo ? ` Идёт реклама: ещё ${S.promo} ч.` : ''}</p>${acct}
+        <p class="muted">Дёшево — больше клиентов и репутации, но ниже оплата. Дорого — наоборот.</p>
+        <div class="row"><span class="muted">${S.promo ? `Идёт реклама: ещё ${S.promo} ч` : 'Реклама: вдвое больше клиентов на двое суток'}</span><button class="btn sm" type="button" data-act="promoBuy" ${S.promo || S.money < 1000 * repLevel() ? 'disabled' : ''}>Запустить · ${fmt$(1000 * repLevel())}</button></div>${acct}
+        ${marketHtml()}
         <h3>Загрузка в пик: контракты / мощность</h3>${['cpu', 'sto', 'gpu'].map(capRow).join('')}
         <p class="muted">Нагрузка клиентов меняется по часам: сайты пикуют днём, игры и видео вечером, ИИ — круглые сутки. Не хватит мощности — упадёт аптайм и репутация.</p>
         <h3>Предложения</h3><div class="list">${offers || '<p class="muted">Новых предложений пока нет. Менеджеры продаж приводят больше клиентов.</p>'}</div>
@@ -1354,14 +1711,26 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       return `<h3>Персонал · зарплаты ${fmt$(total)}/день</h3><div class="list">${Object.keys(STAFF).map((k) => {
         const R = STAFF[k];
         const busy = k === 'admin' ? ` · заняты ${S.jobs.length}` : '';
-        return `<div class="item"><div class="row"><b>${R.name}</b><span class="meta">${fmt$(R.pay)}/день</span></div><p class="muted">${R.desc}</p>
+        const segBtn = (key, v, label) => `<button type="button" data-act="policy" data-a="${key}:${v}" aria-pressed="${String(S.policy[key]) === String(key === 'racks' ? v === 1 : v)}">${label}</button>`;
+        const pol = k === 'buyer' ? `<div class="row"><span class="muted">Запас мощности</span><div class="seg">${[0.1, 0.25, 0.5].map((v) => segBtn('headroom', v, `${v * 100}%`)).join('')}</div></div>
+          <div class="row"><span class="muted">Не тратить ниже</span><div class="seg">${[0, 5000, 25000, 100000].map((v) => segBtn('reserve', v, fmt$(v))).join('')}</div></div>
+          <div class="row"><span class="muted">Ставить новые стойки</span><div class="seg">${segBtn('racks', 1, 'Да')}${segBtn('racks', 0, 'Нет')}</div></div>` : '';
+        return `<div class="item"><div class="row"><b>${R.name}</b><span class="meta">${fmt$(R.pay)}/день</span></div><p class="muted">${R.desc}</p>${pol}
           <div class="row"><span class="meta">В штате: ${S.staff[k]}${R.max ? ` из ${R.max}` : ''}${busy}</span><span><button class="btn sm" type="button" data-act="fireStaff" data-a="${k}" ${S.staff[k] ? '' : 'disabled'}>Уволить</button> <button class="btn sm primary" type="button" data-act="hire" data-a="${k}" ${R.max && S.staff[k] >= R.max ? 'disabled' : ''}>Нанять</button></span></div></div>`;
       }).join('')}</div>`;
     },
     tech() {
       const r = S.research;
       const cur = r ? TECH.find((t) => t.id === r.id) : null;
-      return `${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="meter"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
+      const certs = `<h3>Сертификаты</h3><div class="list">${CERTS.map((c) => {
+        const st = S.certs[c.id];
+        const ok = c.ok();
+        const status = st ? (st.on ? '<span class="meta ok">действует</span>' : '<span class="meta crit">приостановлен</span>') : `<span class="meta">${fmt$(c.price)}</span>`;
+        return `<div class="item ${st && st.on ? 'done' : ''}"><div class="row"><b>${c.name}</b>${status}</div><p class="muted">${c.desc}</p>
+          <p class="muted ${ok ? 'ok' : 'warn'}">${ok ? '✓' : '✗'} ${c.need}</p>
+          ${st ? '' : `<div class="row"><span></span><button class="btn sm primary" type="button" data-act="cert" data-a="${c.id}" ${ok && S.money >= c.price ? '' : 'disabled'}>Получить</button></div>`}</div>`;
+      }).join('')}</div>`;
+      return certs + `<h3>Исследования</h3>${cur ? `<div class="item cur"><div class="row"><b>${cur.name}</b><span class="meta">ещё ${r.left} ч</span></div><div class="meter"><i style="width:${(1 - r.left / r.total) * 100}%;background:var(--accent)"></i></div></div>` : '<p class="muted">Лаборатория свободна. Выберите исследование.</p>'}
         <div class="list">${TECH.map((t) => {
           const done = hasTech(t.id);
           const reqOk = !t.req || t.req.every(hasTech);
@@ -1385,13 +1754,42 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       }
       const value = valuation();
       const lim = loanLimit();
-      const loanHtml = `<h3>Кредит</h3><dl class="kv"><dt>Долг</dt><dd class="${S.loan ? 'warn' : ''}">${fmt$(S.loan)}</dd><dt>Проценты</dt><dd>1,2% в день · ${fmt$(S.loan * 0.012)}</dd><dt>Банк готов дать ещё</dt><dd>${fmt$(lim)}</dd><dt>Доля инвесторов</dt><dd>${Math.round(S.equity * 100)}%</dd></dl>
+      const insHtml = `<h3>Страховка</h3><p class="muted">Покрывает 80% стоимости сгоревших серверов и половину штрафов за SLA. Взнос — 0,4% стоимости оборудования в день.</p>
+        <div class="row"><span class="meta">${S.insured ? 'действует' : 'нет'} · ${fmt$(insurancePremium())}/день</span><button class="btn sm ${S.insured ? '' : 'primary'}" type="button" data-act="insure">${S.insured ? 'Отменить' : 'Застраховать'}</button></div>`;
+      const loanHtml = insHtml + `<h3>Кредит</h3><dl class="kv"><dt>Долг</dt><dd class="${S.loan ? 'warn' : ''}">${fmt$(S.loan)}</dd><dt>Проценты</dt><dd>1,2% в день · ${fmt$(S.loan * 0.012)}</dd><dt>Банк готов дать ещё</dt><dd>${fmt$(lim)}</dd><dt>Доля инвесторов</dt><dd>${Math.round(S.equity * 100)}%</dd></dl>
         <div class="row"><span>${[5000, 25000, 100000, 500000].filter((v) => v <= lim).map((v) => `<button class="btn sm" type="button" data-act="loan" data-a="${v}">Взять ${fmt$(v)}</button>`).join(' ') || '<span class="muted">Лимит исчерпан</span>'}</span></div>
         ${S.loan ? `<div class="row"><span></span><span><button class="btn sm" type="button" data-act="repay" data-a="5000" ${S.money >= Math.min(5000, S.loan) ? '' : 'disabled'}>Погасить ${fmt$(Math.min(5000, S.loan))}</button> <button class="btn sm primary" type="button" data-act="repay" data-a="all" ${S.money >= S.loan ? '' : 'disabled'}>Погасить всё</button></span></div>` : ''}`;
       return `<h3>Сегодня</h3><dl class="kv"><dt>Доход от клиентов</dt><dd class="ok">${fmt$(d.inc)}</dd><dt>Электричество</dt><dd>${fmt$(-d.elec)}</dd><dt>Покупки, штрафы, награды</dt><dd>${fmt$(-d.other)}</dd><dt>Зарплаты (в полночь)</dt><dd>${fmt$(-Object.keys(STAFF).reduce((a, k) => a + STAFF[k].pay * S.staff[k], 0))}</dd><dt>Аренда (в полночь)</dt><dd>${fmt$(-HALLS.reduce((a, h, i) => a + (S.halls[i].open ? h.rent : 0), 0))}</dd></dl>
         <h3>Чистая прибыль по дням</h3>${chart}
         <dl class="kv"><dt>Серверов</dt><dd>${countServers()}</dd><dt>Лучший день</dt><dd>${fmt$(S.stats.bestDay)}</dd><dt>Контрактов выполнено / провалено</dt><dd>${S.stats.done} / ${S.stats.failed}</dd><dt>Оценка компании</dt><dd>${fmt$(value)}</dd></dl>
         ${S.debtDays ? `<p class="crit">Счёт в минусе ${S.debtDays} дн. На 3-й день — банкротство.</p>` : ''}${loanHtml}`;
+    },
+    tender() {
+      const T = S.tender;
+      let cur = '<p class="muted">Сейчас тендеров нет. Новый объявят через несколько дней.</p>';
+      if (T) {
+        cur = `<div class="item cur"><div class="row"><b>${T.name}</b><span>${T.gov ? '<span class="tag urgent">Госзаказ</span> ' : ''}${typeTag(T.type)}</span></div>
+          <div class="row meta"><span>${KINDS[T.kind].label} · ${fmtN(T.amount)} ${TYPES[T.type].unit} · SLA ${T.sla}%</span><span>${T.days} дн.</span></div>
+          <div class="row meta"><span>Базовая цена ${fmt$(T.base)}/ч</span><span>итоги через ${T.left} ч</span></div>
+          <p class="muted">Чем ниже ставка и выше репутация, тем больше шанс. Выиграли — контракт ваш сразу, мощности нужно иметь заранее.</p>
+          <div class="bids">${BIDS.map((b) => `<button class="btn" type="button" data-act="bid" data-a="${b}" aria-pressed="${T.bid === b}">${Math.round(b * 100)}%<small>${fmt$(T.base * b)}/ч</small></button>`).join('')}</div>
+          ${T.bid ? '<button class="btn sm" type="button" data-act="bid" data-a="off">Отозвать заявку</button>' : ''}</div>`;
+      }
+      const rivals = S.rivals.map((r, n) => r.bought
+        ? `<div class="item done"><div class="row"><b>${r.name}</b><span class="meta ok">ваша компания</span></div></div>`
+        : `<div class="item"><div class="row"><b>${r.name}</b><span class="meta">репутация ${Math.round(r.rep)}</span></div><div class="meter"><i style="width:${r.rep}%;background:var(--warn)"></i></div>
+          <div class="row"><span class="muted">После покупки: +${fmt$(rivalPrice(r) / 600)}/ч и меньше соперников</span><button class="btn sm primary" type="button" data-act="buyrival" data-a="${n}" ${S.money < rivalPrice(r) ? 'disabled' : ''}>Купить · ${fmt$(rivalPrice(r))}</button></div></div>`).join('');
+      const hist = S.tlog.map((x) => `<div class="row meta"><span>${x.name}</span><span class="${x.me ? 'ok' : ''}">${x.winner}</span></div>`).join('');
+      return `<h3>Текущий тендер</h3>${cur}<h3>Конкуренты · ваша репутация ${Math.round(S.rep)}</h3><div class="list">${rivals}</div>${hist ? `<h3>Последние тендеры</h3>${hist}` : ''}${S.subs ? `<p class="muted">Доход дочерних компаний: ${fmt$(S.subs)}/ч</p>` : ''}`;
+    },
+    mail() {
+      const list = S.inbox.map((m) => {
+        const M = MSGS[m.i];
+        return `<div class="item"><div class="row"><b>${M.from}</b><span class="meta">ответить за ${m.left} ч</span></div><p>${M.text(m.data)}</p>
+          <div class="btnrow"><button class="btn sm primary" type="button" data-act="mailans" data-a="${m.id}:yes">${M.yes[0]}</button><button class="btn sm" type="button" data-act="mailans" data-a="${m.id}:no">${M.no[0]}</button></div></div>`;
+      }).join('');
+      return `<div class="row"><h3>Входящие</h3><button class="btn sm" type="button" data-act="autono">${S.autoNo ? 'Автоотказ: вкл' : 'Автоотказ: выкл'}</button></div>
+        <div class="list">${list || '<p class="muted">Писем нет. Если не ответить вовремя, выбирается безопасный вариант.</p>'}</div>`;
     },
     goals() {
       return `<div class="list">${GOALS.map((g, n) => `<div class="item ${n < S.goal ? 'done' : n === S.goal ? 'cur' : ''}"><div class="row"><span>${n < S.goal ? '✓ ' : ''}${g.t}</span><span class="meta">+${fmt$(g.r)}</span></div></div>`).join('')}</div>`;
@@ -1412,21 +1810,6 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   function layoutCanvas() {
     const D = HALLS[S.cur];
     const box = $('#cbox');
-    if (!G3.ok) S.mode = '2d';
-    const is3d = S.mode === '3d';
-    box.classList.toggle('is3d', is3d);
-    glc.hidden = !is3d; cv.hidden = is3d; $('#hint3d').hidden = !is3d;
-    if (is3d) {
-      const w = Math.max(280, box.clientWidth - 2);
-      const h = Math.round(clamp(w * 0.62, 320, 640));
-      G3.R.setSize(w, h, false);
-      glc.style.height = `${h}px`;
-      const prevAspect = G3.cam.aspect;
-      G3.cam.aspect = w / h;
-      G3.cam.updateProjectionMatrix();
-      if (Math.abs(prevAspect - G3.cam.aspect) > 0.2 && G3.hall === S.cur) frame3D();
-      return;
-    }
     const avail = Math.max(240, box.clientWidth - 18);
     T = Math.floor(clamp(avail / (D.w + 0.8), 26, 96));
     O = Math.round(T * 0.4);
@@ -1651,9 +2034,32 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     if (tx < 0 || ty < 0 || tx >= D.w || ty >= D.h) return -1;
     return ty * D.w + tx;
   }
-  cv.addEventListener('pointermove', (e) => { hover = tileAt(e); });
+  let painting = false, lastPaint = -1;
+  function paintAt(i) {
+    if (i < 0 || i === lastPaint || !S.started || S.over) return;
+    lastPaint = i;
+    const H = S.halls[S.cur];
+    if (!H.open) return;
+    const t = H.grid[i];
+    if (S.tool === 'demolish') { if (t) { S.sel = { h: S.cur, i }; ACT.demolish(); S.sel = null; } }
+    else if (!t) place(S.tool, S.cur, i);
+    renderUI();
+  }
+  const stopPaint = () => { painting = false; lastPaint = -1; };
+  cv.addEventListener('pointerdown', (e) => {
+    if (S.tool === 'select' || e.button !== 0) return;
+    const i = tileAt(e);
+    if (i < 0) return;
+    Sound.init();
+    painting = true;
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    paintAt(i);
+  });
+  cv.addEventListener('pointermove', (e) => { hover = tileAt(e); if (painting) paintAt(hover); });
+  cv.addEventListener('pointerup', stopPaint);
+  cv.addEventListener('pointercancel', stopPaint);
   cv.addEventListener('pointerleave', () => { hover = -1; });
-  cv.addEventListener('click', (e) => { const i = tileAt(e); if (i >= 0) tileClick(i); });
+  cv.addEventListener('click', (e) => { if (S.tool !== 'select') return; const i = tileAt(e); if (i >= 0) tileClick(i); });
   function tileClick(i) {
     if (!S.started || S.over) return;
     const H = S.halls[S.cur];
@@ -1672,498 +2078,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     renderUI();
   }
 
-  // ================= RENDER: 3D =================
-  const glc = $('#gl');
-  const G3 = { ok: !!(window.THREE && window.THREE.OrbitControls) };
-  if (G3.ok) { try { init3D(); } catch (e) { G3.ok = false; } }
-
-  function canvasTex(w, h, paint) {
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    paint(c.getContext('2d'), w, h);
-    const t = new THREE.CanvasTexture(c);
-    t.encoding = THREE.sRGBEncoding;
-    t.anisotropy = 4;
-    return t;
-  }
-  function floorTexture() {
-    const t = canvasTex(128, 128, (g, w, h) => {
-      g.fillStyle = '#0c1116'; g.fillRect(0, 0, w, h);
-      g.fillStyle = '#1e2832'; g.fillRect(3, 3, w - 6, h - 6);
-      g.fillStyle = '#151d25';
-      for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) { g.beginPath(); g.arc(26 + x * 12.7, 26 + y * 12.7, 2.4, 0, 7); g.fill(); }
-    });
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    return t;
-  }
-  function grilleTexture() {
-    return canvasTex(64, 128, (g, w, h) => {
-      g.fillStyle = '#93a7b9'; g.fillRect(0, 0, w, h);
-      g.fillStyle = '#5c6f80';
-      for (let y = 34; y < h - 8; y += 7) g.fillRect(6, y, w - 12, 3);
-      g.fillStyle = '#2f9c6a'; g.fillRect(8, 10, 10, 6);
-      g.fillStyle = '#dfe8f0'; g.fillRect(22, 10, 32, 6);
-    });
-  }
-  function boltTexture() {
-    return canvasTex(64, 64, (g) => {
-      g.fillStyle = '#f2d24a'; g.beginPath(); g.moveTo(32, 4); g.lineTo(60, 58); g.lineTo(4, 58); g.closePath(); g.fill();
-      g.fillStyle = '#111'; g.beginPath();
-      g.moveTo(35, 18); g.lineTo(24, 38); g.lineTo(32, 38); g.lineTo(28, 54); g.lineTo(42, 32); g.lineTo(34, 32); g.closePath(); g.fill();
-    });
-  }
-
-  function init3D() {
-    const R = new THREE.WebGLRenderer({ canvas: glc, antialias: true });
-    R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    R.outputEncoding = THREE.sRGBEncoding;
-    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    R.shadowMap.enabled = !coarse;
-    R.shadowMap.type = THREE.PCFSoftShadowMap;
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#0a0e13');
-    scene.fog = new THREE.Fog('#0a0e13', 30, 80);
-    const cam = new THREE.PerspectiveCamera(36, 16 / 9, 0.1, 200);
-    const ctl = new THREE.OrbitControls(cam, glc);
-    ctl.enableDamping = true; ctl.dampingFactor = 0.08;
-    ctl.minPolarAngle = 0.2; ctl.maxPolarAngle = 1.3;
-    ctl.minDistance = 4; ctl.maxDistance = 48;
-    const hemi = new THREE.HemisphereLight(0xa8c2e0, 0x0c1015, 0.6);
-    const dir = new THREE.DirectionalLight(0xffffff, 0.75);
-    dir.position.set(-7, 15, 10);
-    dir.castShadow = true;
-    dir.shadow.mapSize.set(2048, 2048);
-    dir.shadow.bias = -0.0006;
-    const cold = new THREE.PointLight(0x6cb4ff, 0.7, 30);
-    cold.position.set(0, 4, 2);
-    const alarm = new THREE.PointLight(0xff3a1a, 0, 18);
-    alarm.position.set(0, 3, 0);
-    scene.add(hemi, dir, dir.target, cold, alarm);
-    const box = new THREE.BoxGeometry(1, 1, 1);
-    Object.assign(G3, {
-      R, scene, cam, ctl, hemi, dir, cold, alarm, root: null, sig: '', hall: -1, people: [], labels: new Map(), fires: new Map(),
-      ray: new THREE.Raycaster(), color: new THREE.Color(), m4: new THREE.Matrix4(), q: new THREE.Quaternion(), qFlat: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)),
-      v: new THREE.Vector3(), sc: new THREE.Vector3(),
-      geo: { box, cone: new THREE.ConeGeometry(0.11, 0.55, 6), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 20), sphere: new THREE.SphereGeometry(0.5, 14, 10), plane: new THREE.PlaneGeometry(1, 1) },
-      mat: {
-        floor: new THREE.MeshStandardMaterial({ map: floorTexture(), roughness: 0.85, metalness: 0.1 }),
-        wall: new THREE.MeshStandardMaterial({ color: 0x121a22, roughness: 0.95 }),
-        slab: new THREE.MeshStandardMaterial({ color: 0x080b0f, roughness: 1 }),
-        trim: new THREE.MeshBasicMaterial({ color: 0x2f7fd0 }),
-        cab: new THREE.MeshStandardMaterial({ color: 0x1b232c, roughness: 0.4, metalness: 0.65 }),
-        plate: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0.35 }),
-        led: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-        strip: new THREE.MeshBasicMaterial({ color: 0xffffff }),
-        crac: new THREE.MeshStandardMaterial({ color: 0xffffff, map: grilleTexture(), roughness: 0.6, metalness: 0.3 }),
-        chiller: new THREE.MeshStandardMaterial({ color: 0x55738a, roughness: 0.55, metalness: 0.45 }),
-        dark: new THREE.MeshStandardMaterial({ color: 0x0d1217, roughness: 0.8 }),
-        blade: new THREE.MeshStandardMaterial({ color: 0xc6dcef, roughness: 0.35, metalness: 0.6 }),
-        ups: new THREE.MeshStandardMaterial({ color: 0x232d36, roughness: 0.5, metalness: 0.55 }),
-        gen: new THREE.MeshStandardMaterial({ color: 0xd9b43a, roughness: 0.6, metalness: 0.3 }),
-        trafo: new THREE.MeshStandardMaterial({ color: 0x5d6873, roughness: 0.55, metalness: 0.6 }),
-        sign: new THREE.MeshBasicMaterial({ map: boltTexture(), transparent: true }),
-        miner: new THREE.MeshStandardMaterial({ color: 0x3b2c18, roughness: 0.5, metalness: 0.5 }),
-        minerGlow: new THREE.MeshBasicMaterial({ color: 0xffa040 }),
-        ledOn: new THREE.MeshBasicMaterial({ color: 0x4dff9a }),
-        ledWarn: new THREE.MeshBasicMaterial({ color: 0xffb02e }),
-        ledOff: new THREE.MeshBasicMaterial({ color: 0x1a2229 }),
-        fire1: new THREE.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.92 }),
-        fire2: new THREE.MeshBasicMaterial({ color: 0xffd23a, transparent: true, opacity: 0.92 }),
-        shirt: new THREE.MeshStandardMaterial({ color: 0x3f8fe0, roughness: 0.7 }),
-        pants: new THREE.MeshStandardMaterial({ color: 0x1d252e, roughness: 0.8 }),
-        guard: new THREE.MeshStandardMaterial({ color: 0x2b3640, roughness: 0.7 }),
-        skin: new THREE.MeshStandardMaterial({ color: 0xe8c4a0, roughness: 0.8 }),
-        hover: new THREE.MeshBasicMaterial({ color: 0x6cb4ff, transparent: true, opacity: 0.3, depthWrite: false }),
-        hoverBad: new THREE.MeshBasicMaterial({ color: 0xff5f5f, transparent: true, opacity: 0.3, depthWrite: false }),
-        sel: new THREE.MeshBasicMaterial({ color: 0x6cb4ff, transparent: true, opacity: 0.5, depthWrite: false }),
-        range: new THREE.MeshBasicMaterial({ color: 0x6cb4ff, transparent: true, opacity: 0.1, depthWrite: false }),
-        heat: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false }),
-      },
-    });
-    const flat = (mat, y) => { const m = new THREE.Mesh(G3.geo.plane, mat); m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = 2; scene.add(m); return m; };
-    G3.hoverM = flat(G3.mat.hover, 0.02);
-    G3.selM = flat(G3.mat.sel, 0.025);
-    G3.rangeM = flat(G3.mat.range, 0.018);
-
-    let down = null;
-    glc.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, b: e.button }; });
-    glc.addEventListener('pointerup', (e) => {
-      if (down && down.b === 0 && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) {
-        const i = pick3D(e, true);
-        if (i >= 0) tileClick(i);
-      }
-      down = null;
-    });
-    glc.addEventListener('pointermove', (e) => { if (!down) hover = pick3D(e, false); });
-    glc.addEventListener('pointerleave', () => { hover = -1; });
-    glc.addEventListener('contextmenu', (e) => e.preventDefault());
-    if (coarse) $('#hint3d').textContent = 'палец — вращать · два пальца — зум';
-  }
-
-  const wx = (i, D) => (i % D.w) + 0.5 - D.w / 2;
-  const wz = (i, D) => Math.floor(i / D.w) + 0.5 - D.h / 2;
-  function mesh(geo, mat, sx, sy, sz, x, y, z) {
-    const m = new THREE.Mesh(geo, mat);
-    m.scale.set(sx, sy, sz); m.position.set(x, y, z);
-    m.castShadow = true; m.receiveShadow = true;
-    return m;
-  }
-  function fan(r, x, y, z) {
-    const g = new THREE.Group();
-    g.add(mesh(G3.geo.cyl, G3.mat.dark, r * 2, 0.05, r * 2, 0, 0, 0));
-    const blades = new THREE.Group();
-    for (let k = 0; k < 4; k++) {
-      const piv = new THREE.Group();
-      piv.rotation.y = (k * Math.PI) / 2;
-      piv.add(mesh(G3.geo.box, G3.mat.blade, r * 0.85, 0.02, r * 0.32, r * 0.45, 0.04, 0));
-      blades.add(piv);
-    }
-    g.add(blades);
-    g.position.set(x, y, z);
-    G3.fans.push(blades);
-    return g;
-  }
-  function makeObj(k) {
-    const g = new THREE.Group();
-    const M = G3.mat, B = G3.geo.box;
-    if (k === 'crac') {
-      g.add(mesh(B, M.crac, 0.86, 1.9, 0.86, 0, 0.95, 0));
-      g.add(fan(0.3, 0, 1.92, 0));
-    } else if (k === 'chiller') {
-      g.add(mesh(B, M.chiller, 0.94, 1.15, 0.94, 0, 0.575, 0));
-      g.add(fan(0.19, -0.22, 1.17, 0), fan(0.19, 0.22, 1.17, 0));
-      g.add(mesh(B, M.dark, 0.9, 0.5, 0.02, 0, 0.5, 0.475));
-    } else if (k === 'ups') {
-      g.add(mesh(B, M.ups, 0.78, 1.3, 0.78, 0, 0.65, 0));
-      for (let n = 0; n < 4; n++) { const l = mesh(B, M.ledOn, 0.36, 0.07, 0.02, 0, 0.45 + n * 0.14, 0.4); l.castShadow = false; G3.upsLeds.push(l); g.add(l); }
-    } else if (k === 'gen') {
-      g.add(mesh(B, M.gen, 0.9, 0.95, 0.78, 0, 0.475, 0));
-      g.add(mesh(B, M.dark, 0.92, 0.1, 0.8, 0, 0.82, 0));
-      g.add(mesh(G3.geo.cyl, M.dark, 0.14, 0.55, 0.14, 0.28, 1.2, -0.2));
-    } else if (k === 'trafo') {
-      g.add(mesh(B, M.trafo, 0.66, 1.2, 0.5, 0, 0.6, 0));
-      for (let n = 0; n < 4; n++) { g.add(mesh(B, M.trafo, 0.07, 0.95, 0.06, -0.38, 0.6, -0.2 + n * 0.13), mesh(B, M.trafo, 0.07, 0.95, 0.06, 0.38, 0.6, -0.2 + n * 0.13)); }
-      const s = new THREE.Mesh(G3.geo.plane, M.sign); s.scale.set(0.32, 0.32, 1); s.position.set(0, 0.8, 0.252); g.add(s);
-    } else if (k === 'miner') {
-      g.add(mesh(B, M.miner, 0.86, 1.5, 0.86, 0, 0.75, 0));
-      for (let n = 0; n < 5; n++) { const l = mesh(B, M.minerGlow, 0.7, 0.05, 0.02, 0, 0.3 + n * 0.25, 0.44); l.castShadow = false; g.add(l); }
-      g.add(fan(0.25, 0, 1.52, 0));
-    }
-    return g;
-  }
-
-  function sig3D() {
-    const H = S.halls[S.cur];
-    return `${S.cur}:${H.open}:${H.grid.map((t) => (!t ? '.' : t.k === 'rack' ? `r${t.s.join(',')}` : t.k)).join('|')}`;
-  }
-
-  function build3D() {
-    const { scene, mat: M, geo } = G3;
-    const D = HALLS[S.cur], H = S.halls[S.cur];
-    if (G3.root) {
-      scene.remove(G3.root);
-      G3.root.traverse((o) => { if (o.isInstancedMesh) o.dispose(); });
-      G3.labels.forEach((sp) => { sp.material.map.dispose(); sp.material.dispose(); });
-    }
-    const root = new THREE.Group();
-    G3.root = root; scene.add(root);
-    G3.pick = []; G3.fans = []; G3.upsLeds = []; G3.labels = new Map(); G3.fires = new Map();
-
-    M.floor.map.repeat.set(D.w, D.h);
-    const floor = new THREE.Mesh(geo.plane, M.floor);
-    floor.scale.set(D.w, D.h, 1); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.userData.floor = true;
-    root.add(floor); G3.pick.push(floor); G3.floor = floor;
-    root.add(mesh(geo.box, M.slab, D.w + 3, 0.3, D.h + 3, 0, -0.151, 0));
-
-    const WH = 2.8, WT = 0.18, hw = D.w / 2, hh = D.h / 2;
-    root.add(mesh(geo.box, M.wall, D.w + WT * 2, WH, WT, 0, WH / 2, -hh - WT / 2));
-    const segL = hh - 0.7;
-    root.add(mesh(geo.box, M.wall, WT, WH, segL, -hw - WT / 2, WH / 2, -hh + segL / 2));
-    root.add(mesh(geo.box, M.wall, WT, WH, segL, -hw - WT / 2, WH / 2, hh - segL / 2));
-    root.add(mesh(geo.box, M.wall, WT, 0.6, 1.4, -hw - WT / 2, WH - 0.3, 0));
-    root.add(mesh(geo.box, M.wall, D.w + WT * 2, 0.22, WT, 0, 0.11, hh + WT / 2));
-    root.add(mesh(geo.box, M.wall, WT, 0.22, D.h, hw + WT / 2, 0.11, 0));
-    const trim1 = mesh(geo.box, M.trim, D.w, 0.04, 0.04, 0, WH - 0.25, -hh + 0.02); trim1.castShadow = false;
-    const trim2 = mesh(geo.box, M.trim, 0.04, 0.04, D.h, -hw + 0.02, WH - 0.25, 0); trim2.castShadow = false;
-    root.add(trim1, trim2);
-
-    // racks (instanced)
-    const racks = [];
-    H.grid.forEach((t, i) => { if (t && t.k === 'rack') racks.push(i); });
-    const srv = [];
-    racks.forEach((i) => H.grid[i].s.forEach((m, n) => srv.push({ i, n, m })));
-    const inst = (m, n) => { const im = new THREE.InstancedMesh(geo.box, m, Math.max(1, n)); im.count = n; return im; };
-    const cab = inst(M.cab, racks.length);
-    const strip = inst(M.strip, racks.length);
-    const plates = inst(M.plate, srv.length);
-    const leds = inst(M.led, srv.length);
-    const put = (im, j, x, y, z, sx, sy, sz) => { G3.m4.compose(G3.v.set(x, y, z), G3.q.identity(), G3.sc.set(sx, sy, sz)); im.setMatrixAt(j, G3.m4); };
-    racks.forEach((i, j) => {
-      put(cab, j, wx(i, D), 1.0, wz(i, D), 0.82, 2.0, 0.9);
-      put(strip, j, wx(i, D), 2.02, wz(i, D) + 0.41, 0.74, 0.05, 0.08);
-      strip.setColorAt(j, G3.color.set(0x3c8cff));
-    });
-    const TYPE_COL = { cpu: 0x3d7fc4, sto: 0x8a6fd6, gpu: 0xd9822f };
-    srv.forEach((s, j) => {
-      const y = 1.78 - s.n * 0.29;
-      put(plates, j, wx(s.i, D) - 0.05, y, wz(s.i, D) + 0.455, 0.6, 0.22, 0.03);
-      plates.setColorAt(j, G3.color.set(TYPE_COL[MODELS[s.m].type]));
-      put(leds, j, wx(s.i, D) + 0.3, y, wz(s.i, D) + 0.475, 0.06, 0.06, 0.02);
-      leds.setColorAt(j, G3.color.set(0x4dff9a));
-    });
-    cab.castShadow = cab.receiveShadow = true;
-    plates.receiveShadow = true;
-    cab.userData.tiles = racks; strip.userData.tiles = racks;
-    plates.userData.tiles = srv.map((s) => s.i); leds.userData.tiles = plates.userData.tiles;
-    root.add(cab, strip, plates, leds);
-    G3.pick.push(cab, plates, leds);
-    Object.assign(G3, { racks, srv, cab, strip, plates, leds });
-
-    // other equipment
-    H.grid.forEach((t, i) => {
-      if (!t || t.k === 'rack') return;
-      const g = makeObj(t.k);
-      g.position.set(wx(i, D), 0, wz(i, D));
-      g.traverse((o) => { o.userData.tile = i; });
-      root.add(g); G3.pick.push(g);
-    });
-
-    // heat overlay
-    const heat = new THREE.InstancedMesh(geo.plane, M.heat, D.w * D.h);
-    heat.renderOrder = 1;
-    for (let i = 0; i < D.w * D.h; i++) heat.setColorAt(i, G3.color.set(0x000000));
-    heat.visible = false;
-    root.add(heat);
-    G3.heat = heat;
-
-    const ext = Math.max(D.w, D.h) / 2 + 3;
-    Object.assign(G3.dir.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 50 });
-    G3.dir.shadow.camera.updateProjectionMatrix();
-    G3.sig = sig3D();
-    if (G3.hall !== S.cur) { frame3D(); G3.hall = S.cur; }
-  }
-
-  function frame3D() {
-    const D = HALLS[S.cur];
-    const aspect = G3.cam.aspect || 1.6;
-    const d = Math.max(D.w, D.h * 1.3) * Math.max(1, 1.5 / aspect);
-    G3.cam.position.set(d * 0.45, d * 0.8 + 3.5, d * 0.95 + 3);
-    G3.ctl.target.set(0, 0.6, 0);
-    G3.ctl.update();
-  }
-
-  function pick3D(e, full) {
-    if (!G3.floor) return -1;
-    const r = glc.getBoundingClientRect();
-    const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    G3.ray.setFromCamera(v, G3.cam);
-    const hits = G3.ray.intersectObjects(full ? G3.pick : [G3.floor], true);
-    const D = HALLS[S.cur];
-    for (const h of hits) {
-      let o = h.object;
-      if (o.isInstancedMesh && o.userData.tiles && h.instanceId != null) return o.userData.tiles[h.instanceId];
-      if (o.userData.floor) {
-        const x = Math.floor(h.point.x + D.w / 2), z = Math.floor(h.point.z + D.h / 2);
-        return x < 0 || z < 0 || x >= D.w || z >= D.h ? -1 : z * D.w + x;
-      }
-      while (o && o.userData.tile === undefined) o = o.parent;
-      if (o) return o.userData.tile;
-    }
-    return -1;
-  }
-
-  function stripColor(t, dark) {
-    if (dark) return 0x111418;
-    if (t.temp < 26) return 0x3c8cff;
-    if (t.temp < 32) return 0x3fd68a;
-    if (t.temp < 40) return 0xf2b24a;
-    return 0xff4040;
-  }
-  function heatColor(t) {
-    if (t < 26) return 0x3c78ff;
-    if (t < 32) return 0x2fd07e;
-    if (t < 40) return 0xf2b24a;
-    return 0xff3030;
-  }
-
-  function label3D(key, text, color, x, y, z) {
-    let sp = G3.labels.get(key);
-    if (!sp) {
-      const c = document.createElement('canvas');
-      c.width = 128; c.height = 56;
-      const tex = new THREE.CanvasTexture(c);
-      sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-      sp.scale.set(0.95, 0.42, 1);
-      sp.renderOrder = 5;
-      sp.userData = { c, tex, key: '' };
-      G3.root.add(sp); G3.labels.set(key, sp);
-    }
-    sp.position.set(x, y, z);
-    const k = text + color;
-    if (sp.userData.key !== k) {
-      const g = sp.userData.c.getContext('2d');
-      g.clearRect(0, 0, 128, 56);
-      g.fillStyle = 'rgba(8,12,16,.86)'; g.fillRect(6, 6, 116, 44);
-      g.fillStyle = color; g.font = '700 30px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(text, 64, 29);
-      sp.userData.tex.needsUpdate = true;
-      sp.userData.key = k;
-    }
-    sp.visible = true;
-  }
-
-  function person(shirt) {
-    const g = new THREE.Group();
-    g.add(mesh(G3.geo.cyl, G3.mat.pants, 0.24, 0.42, 0.2, 0, 0.21, 0));
-    g.add(mesh(G3.geo.cyl, shirt, 0.34, 0.5, 0.26, 0, 0.66, 0));
-    g.add(mesh(G3.geo.sphere, G3.mat.skin, 0.24, 0.24, 0.24, 0, 1.05, 0));
-    G3.scene.add(g);
-    return g;
-  }
-
-  function update3D(now, frac) {
-    if (!G3.root || G3.sig !== sig3D()) build3D();
-    const D = HALLS[S.cur], H = S.halls[S.cur];
-    const dark = H.open && H.dark;
-    const c = G3.color;
-
-    // LEDs and temperature strips
-    G3.srv.forEach((s, j) => {
-      const t = H.grid[s.i];
-      if (!t || t.k !== 'rack') return;
-      const working = t.s.length - t.broken;
-      let col;
-      if (dark || t.fire) col = 0x06080a;
-      else if (s.n >= working) col = Math.floor(now / 300) % 2 ? 0xff2a2a : 0x2a0606;
-      else col = Math.sin(now / (60 + ((s.i * 7 + s.n * 13) % 60)) + s.n * 1.3) > -0.25 ? 0x4dff9a : 0x0b3320;
-      G3.leds.setColorAt(j, c.setHex(col));
-    });
-    if (G3.leds.instanceColor) G3.leds.instanceColor.needsUpdate = true;
-    G3.racks.forEach((i, j) => { const t = H.grid[i]; if (t) G3.strip.setColorAt(j, c.setHex(stripColor(t, dark))); });
-    if (G3.strip.instanceColor) G3.strip.instanceColor.needsUpdate = true;
-    if (!dark) G3.fans.forEach((f, k) => { f.rotation.y = now / 70 + k; });
-    const outage = S.event && S.event.type === 'outage';
-    G3.upsLeds.forEach((m, k) => { m.material = outage ? (Math.floor(now / 350 + k) % 2 ? G3.mat.ledWarn : G3.mat.ledOff) : G3.mat.ledOn; });
-
-    // fires
-    let firePos = null;
-    H.grid.forEach((t, i) => {
-      if (!t || !t.fire) { const f = G3.fires.get(i); if (f) { G3.root.remove(f); G3.fires.delete(i); } return; }
-      let f = G3.fires.get(i);
-      if (!f) {
-        f = new THREE.Group();
-        for (let n = 0; n < 7; n++) {
-          const cone = new THREE.Mesh(G3.geo.cone, n % 2 ? G3.mat.fire2 : G3.mat.fire1);
-          cone.position.set((Math.random() - 0.5) * 0.6, 2.1, (Math.random() - 0.5) * 0.6);
-          f.add(cone);
-        }
-        f.position.set(wx(i, D), 0, wz(i, D));
-        G3.root.add(f); G3.fires.set(i, f);
-      }
-      f.children.forEach((cone, n) => { const s = 0.7 + 0.6 * Math.abs(Math.sin(now / 90 + n * 1.9)); cone.scale.set(1, s * 1.4, 1); cone.position.y = 2.05 + s * 0.35; });
-      if (!firePos) firePos = f.position;
-    });
-
-    // lighting
-    const k = dark ? 0.15 : 1;
-    G3.hemi.intensity = 0.6 * k;
-    G3.dir.intensity = 0.75 * k;
-    G3.cold.intensity = dark ? 0 : 0.7;
-    if (firePos) { G3.alarm.position.set(firePos.x, 2.6, firePos.z); G3.alarm.color.setHex(0xff6a1a); G3.alarm.distance = 18; G3.alarm.intensity = 2.2 + Math.sin(now / 60) * 0.8; }
-    else if (dark) { G3.alarm.position.set(0, 3, 0); G3.alarm.color.setHex(0xff2a2a); G3.alarm.distance = 40; G3.alarm.intensity = 0.6 + 0.6 * Math.max(0, Math.sin(now / 250)); }
-    else G3.alarm.intensity = 0;
-
-    // overlays
-    G3.labels.forEach((sp) => { sp.visible = false; });
-    G3.heat.visible = S.view === 'heat' && H.open;
-    if (G3.heat.visible) {
-      const cooled = new Set();
-      H.grid.forEach((t, i) => {
-        const b = t && BUILD[t.k];
-        if (!b || !b.cool) return;
-        const x0 = i % D.w, y0 = Math.floor(i / D.w);
-        for (let y = y0 - b.r; y <= y0 + b.r; y++) for (let x = x0 - b.r; x <= x0 + b.r; x++) if (x >= 0 && y >= 0 && x < D.w && y < D.h) cooled.add(y * D.w + x);
-      });
-      for (let i = 0; i < D.w * D.h; i++) {
-        const t = H.grid[i];
-        const hot = t && (t.k === 'rack' || t.k === 'miner');
-        const show = hot || cooled.has(i);
-        G3.m4.compose(G3.v.set(wx(i, D), 0.012, wz(i, D)), G3.qFlat, G3.sc.set(show ? 0.96 : 0, show ? 0.96 : 0, 1));
-        G3.heat.setMatrixAt(i, G3.m4);
-        G3.heat.setColorAt(i, c.setHex(hot ? heatColor(t.temp) : 0x1d4f8f));
-        if (hot) label3D(`h${i}`, `${Math.round(t.temp)}°`, '#ffffff', wx(i, D), 2.5, wz(i, D));
-      }
-      G3.heat.instanceMatrix.needsUpdate = true;
-      if (G3.heat.instanceColor) G3.heat.instanceColor.needsUpdate = true;
-    } else if (S.view === 'power' && H.open) {
-      H.grid.forEach((t, i) => {
-        if (!t) return;
-        const b = BUILD[t.k] || {};
-        const kw = t.k === 'rack' ? t.s.reduce((a, m) => a + MODELS[m].kw, 0) : b.kw || 0;
-        const text = b.power ? `+${b.power}` : b.backup ? `R${b.backup}` : kw ? kw.toFixed(1) : '';
-        if (text) label3D(`p${i}`, text, b.power || b.backup ? '#f2d24a' : '#d6e0ea', wx(i, D), 2.5, wz(i, D));
-      });
-    }
-
-    // people
-    let used = 0;
-    const personAt = (shirt, x, z, walking, face) => {
-      let p = G3.people[used];
-      if (!p) { p = person(shirt); G3.people.push(p); }
-      p.children[1].material = shirt;
-      p.visible = true;
-      const bob = walking ? Math.abs(Math.sin(now / 120 + used)) * 0.06 : 0;
-      p.position.set(x, bob, z);
-      if (face !== undefined) p.rotation.y = face;
-      used++;
-    };
-    if (H.open) {
-      const door = { x: -D.w / 2 - 0.4, z: 0 };
-      const jobsHere = S.jobs.filter((j) => j.h === S.cur);
-      jobsHere.forEach((j) => {
-        const tx = wx(j.i, D), tz = wz(j.i, D) + 0.8;
-        const p = clamp((j.t + frac) / j.travel, 0, 1);
-        const x = door.x + (tx - door.x) * p, z = door.z + (tz - door.z) * p;
-        personAt(G3.mat.shirt, x, z, p < 1, Math.atan2(tx - door.x, tz - door.z));
-      });
-      const idle = Math.max(0, S.staff.admin - S.jobs.length);
-      if (S.cur === 0 || jobsHere.length === 0) for (let n = 0; n < Math.min(idle, 4); n++) personAt(G3.mat.shirt, -D.w / 2 - 0.55, 1 + n * 0.45, false, Math.PI / 2);
-      if (S.staff.guard > 0) {
-        const pw = D.w + 1.4, ph = D.h + 1.4, per = 2 * (pw + ph);
-        let d = ((now / 1000) * 0.8) % per;
-        let x, z, face;
-        if (d < pw) { x = -pw / 2 + d; z = ph / 2; face = Math.PI / 2; }
-        else if ((d -= pw) < ph) { x = pw / 2; z = ph / 2 - d; face = Math.PI; }
-        else if ((d -= ph) < pw) { x = pw / 2 - d; z = -ph / 2; face = -Math.PI / 2; }
-        else { d -= pw; x = -pw / 2; z = -ph / 2 + d; face = 0; }
-        personAt(G3.mat.guard, x, z, true, face);
-      }
-    }
-    for (let n = used; n < G3.people.length; n++) G3.people[n].visible = false;
-
-    // hover / selection / cooling range
-    const place3 = (m, i, size) => { m.visible = true; m.position.x = wx(i, D); m.position.z = wz(i, D); m.scale.set(size, size, 1); };
-    G3.hoverM.visible = false; G3.selM.visible = false; G3.rangeM.visible = false;
-    if (H.open && hover >= 0 && hover < D.w * D.h) {
-      const t = H.grid[hover];
-      const okPlace = S.tool === 'select' ? true : S.tool === 'demolish' ? !!t : !t;
-      G3.hoverM.material = okPlace ? G3.mat.hover : G3.mat.hoverBad;
-      place3(G3.hoverM, hover, 0.98);
-      const b = BUILD[S.tool];
-      if (b && b.cool && okPlace) place3(G3.rangeM, hover, b.r * 2 + 1);
-    }
-    if (S.sel && S.sel.h === S.cur) {
-      place3(G3.selM, S.sel.i, 1.02);
-      const t = H.grid[S.sel.i], b = t && BUILD[t.k];
-      if (b && b.cool) place3(G3.rangeM, S.sel.i, b.r * 2 + 1);
-    }
-
-    G3.ctl.update();
-    G3.R.render(G3.scene, G3.cam);
-  }
-
   // ================= INPUT =================
-  document.addEventListener('pointerdown', (e) => { if (e.target.closest('#tab, #mail')) pressing = true; });
+  document.addEventListener('pointerdown', (e) => { if (e.target.closest('#tab')) pressing = true; });
   const release = () => setTimeout(() => { pressing = false; }, 0);
   document.addEventListener('pointerup', release);
   document.addEventListener('pointercancel', release);
@@ -2198,7 +2114,8 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
           <li>Подписывайте контракты с клиентами: сайты, банки, игры, видео, нейросети.</li>
           <li>Ставьте стойки и серверы, следите за теплом и мощностью зала.</li>
           <li>Нанимайте админов и безопасников, исследуйте технологии, арендуйте новые залы.</li>
-          <li>Отвечайте на письма: инвесторы, стажёр Петя, майнеры и пожарная инспекция.</li>
+          <li>Следите за рынком, участвуйте в тендерах и поглощайте конкурентов.</li>
+          <li>Рутину отдайте людям: завхоз докупает железо, аккаунт-менеджер подписывает контракты.</li>
           <li>Пожары, DDoS, отключения света и экскаваторы прилагаются. При авариях игра сама встаёт на паузу.</li>
         </ul>
         ${saved && saved.v === 1 && !saved.over ? `<button class="btn primary" type="button" data-act="load">Продолжить · день ${saved.day}, ${fmt$(saved.money)}</button><button class="btn" type="button" data-act="newgame">Новая игра</button>` : `<button class="btn primary" type="button" data-act="newgame">Начать</button>`}`;
@@ -2225,7 +2142,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
   ACT.load = () => {
     try {
       const data = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0 }, data.staff); if (!G3.ok) S.mode = '2d'; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
+      if (data && data.v === 1) { const base = newState(); S = Object.assign(base, data); S.staff = Object.assign({ admin: 0, eng: 0, guard: 0, sales: 0, acct: 0, buyer: 0 }, data.staff); S.stats = Object.assign({ tenders: 0 }, data.stats); S.policy = Object.assign({ headroom: 0.25, reserve: 5000, racks: true }, data.policy); S.inbox = data.inbox || []; S.hw = data.hw || { cpu: 1, sto: 1, gpu: 1 }; S.certs = data.certs || {}; S.started = true; S.paused = false; S.sel = null; $('#overlay').hidden = true; afterLoad(); log('Игра загружена'); return; }
     } catch (e) { /* fall through */ }
     ACT.newgame();
   };
@@ -2248,7 +2165,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       if (ticked) renderUI();
     }
     const frac = S.paused ? 0 : acc / HOUR_MS;
-    if (S.mode === '3d' && G3.ok) update3D(now, frac); else draw(now, frac);
+    draw(now, frac);
     requestAnimationFrame(frame);
   }
 
