@@ -54,16 +54,17 @@ button { font: inherit; color: inherit; }
 }
 
 /* Top bar */
-.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.bar { display: grid; grid-template-columns: auto auto; justify-content: space-between; align-items: center; gap: 10px 16px; }
 .logo { font: 800 22px/1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
 .logo span { color: var(--accent); }
-.res { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 600px; }
+.res { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(auto-fit, minmax(116px, 1fr)); gap: 6px; }
 .chip {
-  display: grid; gap: 1px; padding: 5px 10px; min-width: 70px;
+  display: grid; gap: 1px; padding: 5px 9px; min-width: 0;
   background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
 }
 .chip .k { font: 500 9.5px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-.chip .v { font: 600 15px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip .v { font: 600 15px/1.3 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rRep { font-family: var(--f-body); }
 .v.pos { color: var(--ok); } .v.neg { color: var(--crit); }
 .stars { color: var(--warn); letter-spacing: 1px; }
 .stars i { font-style: normal; color: var(--metal-hi); }
@@ -85,6 +86,15 @@ button { font: inherit; color: inherit; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
+.status { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
+.status > .goal, .status > .event {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 2px 12px;
+  height: 74px; overflow: hidden;
+}
+.status > div > span {
+  grid-column: 1 / -1; grid-row: 2;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .goal {
   display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
   padding: 8px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
@@ -99,6 +109,8 @@ button { font: inherit; color: inherit; }
 }
 .event.mild { border-left-color: var(--warn); }
 .event.good { border-left-color: var(--ok); }
+.event.calm { border-left-color: var(--line); }
+.event.calm span { color: var(--dim); }
 .event strong { font-weight: 600; }
 .event span { color: var(--dim); flex: 1 1 260px; }
 .event .left { font: 600 12px var(--f-mono); color: var(--warn); flex: 0 0 auto; }
@@ -111,11 +123,12 @@ button { font: inherit; color: inherit; }
   flex: 0 0 auto; display: grid; gap: 0; text-align: left;
   padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); cursor: pointer; min-width: 0;
 }
+.halls button span, .halls button small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .halls button small { font: 500 10.5px var(--f-mono); color: var(--dim); }
 .halls button[aria-pressed="true"] { background: var(--panel-2); border-color: var(--accent); }
 .halls button.locked { opacity: .6; }
 .halls button.alarm small { color: var(--crit); }
-.hallinfo { display: flex; flex-wrap: wrap; gap: 4px 16px; font: 500 12px var(--f-mono); color: var(--dim); }
+.hallinfo { display: flex; flex-wrap: wrap; gap: 4px 16px; min-height: 2.6em; align-content: flex-start; font: 500 12px var(--f-mono); color: var(--dim); }
 .hallinfo b { color: var(--fg); font-weight: 600; }
 .hallinfo .over { color: var(--crit); }
 .canvasbox {
@@ -142,7 +155,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 }
 .tabs button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--accent); }
 .tabs button sup { font: 600 9px var(--f-mono); color: var(--accent); }
-.tabbody { padding: 14px; max-height: 640px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.tabbody { padding: 14px; height: min(620px, 72vh); overflow: auto; overscroll-behavior: contain; display: grid; gap: 12px; align-content: start; }
 .tabbody h3 { margin: 0; font: 600 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
 .tabbody p { margin: 0; }
 .muted { color: var(--dim); font-size: 13px; }
@@ -174,7 +187,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 .price { font: 600 12.5px var(--f-mono); white-space: nowrap; }
 .chart { width: 100%; height: 120px; display: block; }
 
-.log ol { list-style: none; margin: 0; padding: 12px 14px; display: grid; gap: 5px; max-height: 220px; overflow: auto; font-size: 12.5px; }
+.log ol { list-style: none; margin: 0; padding: 12px 14px; display: grid; gap: 5px; height: 200px; overflow: auto; overscroll-behavior: contain; font-size: 12.5px; }
 .log li { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; }
 .log time { font: 500 11px/1.6 var(--f-mono); color: var(--dim); }
 .log li.warn span { color: var(--warn); } .log li.crit span { color: var(--crit); } .log li.good span { color: var(--ok); }
@@ -203,7 +216,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
 
 @media (max-width: 1000px) {
   .main { grid-template-columns: minmax(0, 1fr); }
-  .tabbody { max-height: none; }
+}
+@media (max-width: 520px) {
+  .res { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; }
+  .res .date { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -218,7 +234,7 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
       <div class="chip"><span class="k">Счёт</span><span class="v" id="rMoney">$0</span></div>
       <div class="chip"><span class="k">За 24 часа</span><span class="v" id="rProfit">$0</span></div>
       <div class="chip"><span class="k">Репутация</span><span class="v stars" id="rRep"></span></div>
-      <div class="chip"><span class="k">Дата</span><span class="v" id="rDate">День 1, 08:00</span></div>
+      <div class="chip date"><span class="k">Дата</span><span class="v" id="rDate">День 1, 08:00</span></div>
       <div class="chip"><span class="k">Вычисления, ядер</span><span class="v" id="rCpu">0 / 0</span></div>
       <div class="chip"><span class="k">Хранение, ТБ</span><span class="v" id="rSto">0 / 0</span></div>
       <div class="chip"><span class="k">ИИ, GPU</span><span class="v" id="rGpu">0 / 0</span></div>
@@ -235,8 +251,10 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     </div>
   </header>
 
-  <div class="goal" id="goal"></div>
-  <div class="event" id="event" hidden></div>
+  <div class="status">
+    <div class="goal" id="goal"></div>
+    <div class="event calm" id="event"></div>
+  </div>
 
   <main class="main">
     <section class="floor">
@@ -922,10 +940,12 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
     const evBox = $('#event');
     if (ev) {
       const E = EVENTS[ev.type];
-      evBox.hidden = false;
       evBox.className = `event ${E.cls}`;
       setHTML('#event', `<strong>${E.name}</strong><span>${E.desc}</span><b class="left">ещё ${ev.left} ч</b>`);
-    } else evBox.hidden = true;
+    } else {
+      evBox.className = 'event calm';
+      setHTML('#event', '<strong>Всё спокойно</strong><span>Аварий нет. Самое время строиться.</span>');
+    }
 
     // halls nav
     setHTML('#halls', HALLS.map((D, i) => {
@@ -937,13 +957,13 @@ canvas { display: block; touch-action: manipulation; cursor: pointer; max-width:
         sub = alarm ? 'тревога' : `${H.grid.filter((t) => t && t.k === 'rack').length} стоек`;
       }
       const alarm = H.open && sub === 'тревога';
-      return `<button type="button" data-act="hall" data-a="${i}" aria-pressed="${S.cur === i}" class="${H.open ? '' : 'locked'} ${alarm ? 'alarm' : ''}">${D.name}<small>${sub}</small></button>`;
+      return `<button type="button" data-act="hall" data-a="${i}" aria-pressed="${S.cur === i}" class="${H.open ? '' : 'locked'} ${alarm ? 'alarm' : ''}" title="${D.name}"><span>${D.name}</span><small>${sub}</small></button>`;
     }).join(''));
 
     const H = S.halls[S.cur], D = HALLS[S.cur];
     if (H.open) {
       refreshHall(S.cur);
-      setHTML('#hallinfo', `<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>${H.dark ? '<span class="over"><b class="over">ЗАЛ ОБЕСТОЧЕН</b></span>' : ''}`);
+      setHTML('#hallinfo', `<span>Мощность <b class="${H.load > H.cap * 0.9 ? 'over' : ''}">${H.load.toFixed(1)} / ${H.cap} кВт</b></span><span>Резерв <b class="${H.backup < H.load ? 'over' : ''}">${H.backup} кВт</b></span><span>Воздух <b>${D.amb} °C</b></span><span>Аренда <b>${fmt$(D.rent)}/день</b></span>`);
     } else setHTML('#hallinfo', `<span>Зал ${D.w}×${D.h} клеток · ${D.kw} кВт · воздух ${D.amb} °C · аренда ${fmt$(D.rent)}/день</span>`);
     const lock = $('#lockcard');
     if (!H.open) {
