@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Серверная</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600;800&display=swap">
+<style>
+/* Layout: a night-shift machine room — the racks are the stage, a side console holds the inspector and the log. Single dark look by choice. */
+:root {
+  --room: #0c1116;
+  --panel: #141b22;
+  --metal: #1d2630;
+  --metal-hi: #2a3642;
+  --bay: #090d11;
+  --line: #2a3440;
+  --fg: #d6e0ea;
+  --dim: #7a8897;
+  --accent: #6cb4ff;
+  --accent-ink: #06121f;
+  --ok: #4fd18b;
+  --warn: #f2b24a;
+  --crit: #ff5f5f;
+  --led-off: #2b343d;
+  --scrim: rgba(6, 9, 12, .78);
+  --f-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(108, 180, 255, .08), transparent 70%),
+    var(--room);
+  color: var(--fg);
+  font: 14px/1.45 var(--f-body);
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 40px;
+  display: grid;
+  gap: 16px;
+}
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
+.brand { min-width: 0; }
+.brand h1 {
+  margin: 0;
+  font: 800 26px/1 var(--f-display);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.brand p { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 520px; }
+.stat {
+  display: grid; gap: 2px; align-content: start;
+  padding: 6px 10px; min-width: 76px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
+}
+.stat.wide { flex: 1 1 150px; }
+.stat .k { font: 500 10px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.stat .v { font: 600 16px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter { display: block; height: 4px; background: var(--bay); border-radius: 2px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s linear, background-color .3s; }
+.v.neg { color: var(--crit); }
+
+.controls { display: flex; gap: 8px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 34px; padding: 6px 12px;
+  background: var(--metal-hi); border: 1px solid var(--line); border-radius: 4px;
+  cursor: pointer; font-weight: 500;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .42; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.danger { color: var(--crit); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button {
+  min-height: 34px; padding: 6px 10px; border: 0; background: var(--panel); cursor: pointer;
+  font: 600 12px var(--f-mono);
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* Event banner */
+.event {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 10px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 4px;
+}
+.event.crit { border-left-color: var(--crit); }
+.event .what { flex: 1 1 260px; min-width: 0; }
+.event strong { display: block; font-weight: 600; }
+.event span { color: var(--dim); font-size: 13px; }
+.event .left { font: 600 12px var(--f-mono); color: var(--warn); }
+
+/* Floor */
+.floor { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.racks { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; }
+
+.rack {
+  position: relative;
+  padding: 8px 8px 10px;
+  background: linear-gradient(180deg, var(--metal-hi), var(--metal) 40px);
+  border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 10px 24px rgba(0, 0, 0, .35);
+}
+.rack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 0 2px 8px; }
+.rack-head b { font: 600 12px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+.rack-head span { font: 500 10.5px var(--f-mono); color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rack-head span.over { color: var(--crit); }
+.rack-body { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; }
+.rail {
+  display: grid; grid-auto-rows: 38px; gap: 3px;
+  font: 500 9px/38px var(--f-mono); color: var(--dim); text-align: center;
+  background: repeating-linear-gradient(180deg, transparent 0 8px, var(--bay) 8px 11px) center / 4px 100% no-repeat;
+}
+.rail span { background: var(--metal); line-height: 14px; align-self: center; }
+.units { display: grid; grid-auto-rows: 38px; gap: 3px; min-width: 0; }
+
+.unit {
+  position: relative;
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 7px;
+  padding: 0 7px;
+  background: var(--bay); border: 1px solid var(--line); border-radius: 3px;
+  font: 500 11px var(--f-mono); text-align: left;
+  cursor: pointer; overflow: hidden;
+}
+.unit:hover { border-color: var(--metal-hi); background: #0d1318; }
+.unit.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.unit .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unit .name b { color: var(--dim); font-weight: 400; margin-left: 4px; }
+.unit .meta { color: var(--dim); font-variant-numeric: tabular-nums; }
+.unit .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; }
+.unit .bar i { display: block; height: 100%; width: 0; background: var(--accent); opacity: .7; transition: width .2s linear; }
+
+.unit.empty {
+  background: transparent; border-style: dashed; color: var(--dim);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.unit.empty:hover { color: var(--fg); border-color: var(--accent); }
+
+.leds { display: grid; gap: 4px; }
+.led { width: 6px; height: 6px; border-radius: 50%; background: var(--led-off); }
+.unit[data-st="ok"] .pwr, .unit[data-st="disk"] .pwr { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+.unit[data-st="boot"] .pwr { background: var(--warn); animation: blink .5s steps(2) infinite; }
+.unit[data-st="down"] .pwr { background: var(--crit); box-shadow: 0 0 6px var(--crit); animation: blink .9s steps(2) infinite; }
+.unit[data-st="disk"] .act { background: var(--warn); }
+.unit.busy .act { background: var(--accent); animation: blink var(--blink, .6s) steps(2) infinite; }
+.unit[data-st="down"] { border-color: rgba(255, 95, 95, .5); }
+.unit[data-st="down"] .name, .unit[data-st="off"] .name { color: var(--dim); }
+.unit[data-heat="warm"] .meta { color: var(--warn); }
+.unit[data-heat="hot"] .meta { color: var(--crit); font-weight: 600; }
+.unit[data-heat="hot"] { background: linear-gradient(90deg, rgba(255, 95, 95, .14), var(--bay) 60%); }
+
+.fan {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: conic-gradient(var(--accent) 0 40deg, transparent 0 120deg, var(--accent) 0 160deg, transparent 0 240deg, var(--accent) 0 280deg, transparent 0);
+  animation: spin .6s linear infinite;
+}
+.unit[data-st="broken"] .fan { animation: none; background: conic-gradient(var(--crit) 0 40deg, transparent 0 120deg, var(--crit) 0 160deg, transparent 0 240deg, var(--crit) 0 280deg, transparent 0); }
+.unit[data-st="broken"] .meta { color: var(--crit); }
+.batt { width: 10px; height: 14px; border: 1px solid var(--ok); border-radius: 2px; padding: 1px; display: flex; align-items: flex-end; }
+.batt i { display: block; width: 100%; height: 70%; background: var(--ok); }
+.unit[data-st="drain"] .batt { border-color: var(--warn); }
+.unit[data-st="drain"] .batt i { background: var(--warn); animation: blink .8s steps(2) infinite; }
+
+.locked {
+  position: absolute; inset: 34px 8px 10px; display: grid; place-content: center; gap: 8px; text-align: center;
+  background: rgba(9, 13, 17, .82); border: 1px dashed var(--line); border-radius: 4px; padding: 12px;
+}
+.locked p { margin: 0; color: var(--dim); font-size: 12px; }
+
+@keyframes blink { 50% { opacity: .25; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Side console */
+.side { display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+.panel h2 { margin: 0 0 10px; font: 600 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.insp-title { margin: 0 0 2px; font: 600 15px var(--f-body); }
+.insp-sub { margin: 0 0 12px; color: var(--dim); font-size: 13px; }
+.insp-close { display: none; }
+dl.kv { margin: 0 0 14px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 13px; }
+dl.kv dt { color: var(--dim); }
+dl.kv dd { margin: 0; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+dd.ok { color: var(--ok); } dd.warn { color: var(--warn); } dd.crit { color: var(--crit); }
+.actions { display: grid; gap: 8px; }
+.shop { display: grid; gap: 8px; }
+.shop .btn { justify-content: space-between; text-align: left; padding: 9px 12px; }
+.shop .btn small { display: block; color: var(--dim); font-size: 12px; font-weight: 400; }
+.shop .btn.primary small { color: inherit; opacity: .75; }
+.price { font: 600 13px var(--f-mono); white-space: nowrap; }
+
+.log ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 300px; overflow: auto; font-size: 12.5px; }
+.log li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; }
+.log time { font: 500 11px/1.6 var(--f-mono); color: var(--dim); }
+.log li.warn span { color: var(--warn); }
+.log li.crit span { color: var(--crit); }
+.log li.good span { color: var(--ok); }
+
+/* Overlay */
+.overlay {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: var(--scrim); backdrop-filter: blur(3px);
+}
+.card {
+  width: min(480px, 100%); max-height: 100%; overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+}
+.card h2 { margin: 0 0 8px; font: 800 22px/1.15 var(--f-display); text-transform: uppercase; text-wrap: balance; }
+.card p { margin: 0 0 12px; color: var(--dim); }
+.card ul { margin: 0 0 18px; padding-left: 18px; display: grid; gap: 6px; }
+.card .btn { width: 100%; min-height: 42px; }
+.card .score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 18px; }
+
+@media (max-width: 860px) {
+  .floor { grid-template-columns: minmax(0, 1fr); }
+  .inspector:not(.open) { display: none; }
+  .inspector.open {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    max-height: 60vh; overflow: auto;
+    border-radius: 10px 10px 0 0; border-bottom: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, .55);
+  }
+  .insp-close { display: inline-flex; float: right; }
+  .wrap { padding-bottom: 50vh; }
+}
+@media (max-width: 420px) {
+  .racks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .rack { padding: 6px 5px 8px; }
+  .rack-body { grid-template-columns: 12px minmax(0, 1fr); gap: 3px; }
+  .unit { padding: 0 5px; gap: 5px; font-size: 10.5px; }
+  .unit .name b { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Серверная</h1>
+      <p>Смена дежурного сисадмина. Сервис должен быть в сети.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">День</span><span class="v" id="sDay">1</span></div>
+      <div class="stat"><span class="k">Время</span><span class="v" id="sTime">08:00</span></div>
+      <div class="stat"><span class="k">Бюджет</span><span class="v" id="sMoney">$400</span></div>
+      <div class="stat wide"><span class="k">Трафик, тыс. запр/с</span><span class="v" id="sLoad">0 / 0</span><span class="meter"><i id="mLoad"></i></span></div>
+      <div class="stat wide"><span class="k">Репутация · SLA</span><span class="v" id="sRep">100%</span><span class="meter"><i id="mRep"></i></span></div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="bPause" type="button">Пауза</button>
+      <div class="seg" role="group" aria-label="Скорость времени">
+        <button type="button" data-speed="1" aria-pressed="true">1×</button>
+        <button type="button" data-speed="2" aria-pressed="false">2×</button>
+        <button type="button" data-speed="4" aria-pressed="false">4×</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="event" id="event" hidden></div>
+
+  <main class="floor">
+    <section class="racks" id="racks" aria-label="Стойки"></section>
+    <aside class="side">
+      <div class="panel inspector" id="insp"></div>
+      <div class="panel log">
+        <h2>Журнал</h2>
+        <ol id="log"></ol>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="card"></div>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const LETTERS = 'ABCD';
+  const UNITS = 8;
+  const TICK_MIN = 5;          // game minutes per tick
+  const TICK_MS = 220;         // real ms per tick at 1x
+  const CAP = [0, 10, 22, 36]; // capacity per server level, тыс. запр/с
+  const HEAT = [0, 12, 20, 28];// heat at full load per level
+  const COOL = 30;             // heat removed by one cooler
+  const PRICE = { server: 150, cooler: 90, ups: 120, disk: 60, fix: 50, filter: 200, up: { 2: 220, 3: 380 }, rack: { 2: 500, 3: 900 } };
+  const BEST_KEY = 'serverroom.best';
+
+  let S;
+  let refs = { units: [], rackHeat: [] };
+  let inspKey = '';
+  let eventKey = '';
+
+  // ---------- state ----------
+  function newState() {
+    const racks = [0, 1, 2, 3].map((i) => ({ owned: i < 2, slots: Array(UNITS).fill(null), heat: 0, cool: 0 }));
+    racks[0].slots[0] = server();
+    racks[0].slots[1] = server();
+    racks[0].slots[2] = { kind: 'cooler', broken: false };
+    return {
+      racks, money: 400, earned: 0, rep: 100, day: 1, minute: 8 * 60,
+      speed: 1, paused: false, started: false, over: false,
+      demand: 0, served: 0, cap: 0, event: null, sel: null, log: [],
+    };
+  }
+  function server() { return { kind: 'server', level: 1, temp: 24, load: 0, status: 'ok', boot: 0, powered: true, on: false, spent: PRICE.server }; }
+  const capOf = (s) => CAP[s.level] * (s.status === 'disk' ? 0.5 : 1);
+  const nameOf = (ri, u) => `srv-${LETTERS[ri]}${u + 1}`;
+  const clock = () => `${String(Math.floor(S.minute / 60)).padStart(2, '0')}:${String(S.minute % 60).padStart(2, '0')}`;
+  const money = (v) => (v < 0 ? '−$' : '$') + Math.abs(Math.round(v)).toLocaleString('ru-RU');
+
+  function log(msg, lvl = '') {
+    S.log.unshift({ t: `Д${S.day} ${clock()}`, msg, lvl });
+    S.log.length = Math.min(S.log.length, 40);
+    renderLog();
+  }
+
+  // ---------- simulation ----------
+  function tick() {
+    const ev = S.event;
+    const hour = S.minute / 60;
+    const wave = 0.6 + 0.4 * Math.sin(((hour - 14) / 24) * 2 * Math.PI); // peak at 20:00
+    let demand = 16 * Math.pow(1.17, S.day - 1) * wave;
+    if (ev && ev.type === 'ddos') demand *= 2.2;
+    const ambient = 24 + (ev && ev.type === 'heat' ? 9 : 0);
+    const outage = !!(ev && ev.type === 'outage');
+
+    let cap = 0;
+    let upkeep = 0;
+    S.racks.forEach((r, ri) => {
+      if (!r.owned) return;
+      let budget = outage ? r.slots.filter((s) => s && s.kind === 'ups').length * 4 : Infinity;
+      r.slots.forEach((s, u) => {
+        if (!s) return;
+        if (s.kind === 'cooler') { if (!s.broken) upkeep += 0.03; return; }
+        if (s.kind === 'ups') { upkeep += 0.01; return; }
+        s.on = false;
+        if (s.status === 'down') { s.powered = false; return; }
+        s.powered = budget > 0;
+        if (!s.powered) return;
+        budget--;
+        upkeep += 0.03 * s.level;
+        if (s.status === 'boot' && --s.boot <= 0) { s.status = 'ok'; log(`${nameOf(ri, u)} снова в строю`, 'good'); }
+        if (s.status === 'ok' || s.status === 'disk') { s.on = true; cap += capOf(s); }
+      });
+    });
+
+    const served = Math.min(demand, cap);
+    const util = cap ? served / cap : 0;
+
+    S.racks.forEach((r, ri) => {
+      if (!r.owned) return;
+      let heat = 0, cool = 0;
+      r.slots.forEach((s) => {
+        if (!s) return;
+        if (s.kind === 'server') { s.load = s.on ? util : 0; if (s.on) heat += HEAT[s.level] * s.load + 2; }
+        if (s.kind === 'cooler' && !s.broken) cool += COOL;
+      });
+      r.heat = heat; r.cool = cool;
+      const excess = Math.max(0, heat - cool);
+      r.slots.forEach((s, u) => {
+        if (!s || s.kind !== 'server') return;
+        const target = s.on ? ambient + s.load * 28 + excess * 1.1 : ambient - 2 + excess * 0.3;
+        s.temp += (target - s.temp) * 0.22;
+        if (s.on && s.temp >= 92 && Math.random() < 0.3) {
+          s.status = 'down'; s.on = false;
+          log(`${nameOf(ri, u)} перегрелся и упал (${Math.round(s.temp)} °C)`, 'crit');
+        } else if (s.on && s.status === 'ok' && Math.random() < 0.0012) {
+          s.status = 'disk';
+          log(`${nameOf(ri, u)}: сбой диска, RAID деградировал`, 'warn');
+        }
+      });
+    });
+
+    const income = served * 0.12;
+    S.money += income - upkeep;
+    S.earned += income;
+    S.demand = demand; S.served = served; S.cap = cap;
+
+    const miss = demand > 0 ? 1 - served / demand : 0;
+    if (miss > 0.02) S.rep -= miss * 1.5;
+    else S.rep = Math.min(100, S.rep + 0.08);
+
+    if (ev && --ev.left <= 0) endEvent();
+    if (!S.event && S.day >= 2 && Math.random() < 0.006) startEvent();
+
+    S.minute += TICK_MIN;
+    if (S.minute >= 1440) {
+      S.minute -= 1440; S.day++;
+      log(`Начался день ${S.day}. Пиковый трафик вырос на 17%`);
+    }
+
+    if (S.rep <= 0) { S.rep = 0; gameOver(); }
+  }
+
+  function startEvent() {
+    const pool = ['ddos', 'outage', 'heat', 'ac'];
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    if (type === 'ac') {
+      const coolers = [];
+      S.racks.forEach((r, ri) => r.owned && r.slots.forEach((s, u) => { if (s && s.kind === 'cooler' && !s.broken) coolers.push([s, ri, u]); }));
+      if (!coolers.length) return;
+      const [c, ri, u] = coolers[Math.floor(Math.random() * coolers.length)];
+      c.broken = true;
+      log(`Сломался кондиционер в стойке ${LETTERS[ri]} (U${u + 1})`, 'crit');
+      return;
+    }
+    const left = { ddos: 30, outage: 15, heat: 40 }[type];
+    S.event = { type, left };
+    const msg = {
+      ddos: 'DDoS-атака! Трафик вырос в 2,2 раза',
+      outage: 'Отключение питания в здании. Работают только серверы под ИБП',
+      heat: 'Жара на улице: в машинном зале +9 °C',
+    }[type];
+    log(msg, 'crit');
+  }
+  function endEvent() {
+    const msg = { ddos: 'Атака закончилась', outage: 'Питание восстановлено', heat: 'Жара спала' }[S.event.type];
+    S.event = null;
+    log(msg, 'good');
+  }
+
+  function gameOver() {
+    S.over = true;
+    let best = 0;
+    try { best = Number(localStorage.getItem(BEST_KEY)) || 0; } catch (e) {}
+    const result = S.day - 1 + S.minute / 1440;
+    const isBest = result > best;
+    if (isBest) { try { localStorage.setItem(BEST_KEY, String(result)); } catch (e) {} best = result; }
+    showOverlay('over', { result, best, isBest });
+  }
+
+  // ---------- actions ----------
+  function spend(amount) {
+    if (S.money < amount) return false;
+    S.money -= amount;
+    return true;
+  }
+  function act(action, arg) {
+    const sel = S.sel;
+    const r = sel && S.racks[sel.r];
+    const s = sel && r.slots[sel.u];
+    switch (action) {
+      case 'buy': {
+        if (!spend(PRICE[arg])) return;
+        r.slots[sel.u] = arg === 'server' ? server() : arg === 'cooler' ? { kind: 'cooler', broken: false } : { kind: 'ups' };
+        const label = { server: 'Сервер', cooler: 'Кондиционер', ups: 'ИБП' }[arg];
+        log(`${label} установлен в ${LETTERS[sel.r]}/U${sel.u + 1}`);
+        buildRacks();
+        break;
+      }
+      case 'upgrade': {
+        const cost = PRICE.up[s.level + 1];
+        if (!spend(cost)) return;
+        s.level++; s.spent += cost;
+        log(`${nameOf(sel.r, sel.u)} проапгрейжен до L${s.level}`);
+        buildRacks();
+        break;
+      }
+      case 'reboot':
+        s.status = 'boot'; s.boot = 6;
+        log(`${nameOf(sel.r, sel.u)} перезагружается`);
+        break;
+      case 'disk':
+        if (!spend(PRICE.disk)) return;
+        s.status = 'ok';
+        log(`${nameOf(sel.r, sel.u)}: диск заменён`, 'good');
+        break;
+      case 'fix':
+        if (!spend(PRICE.fix)) return;
+        s.broken = false;
+        log(`Кондиционер в ${LETTERS[sel.r]}/U${sel.u + 1} починен`, 'good');
+        break;
+      case 'sell': {
+        const back = s.kind === 'server' ? s.spent / 2 : s.kind === 'cooler' ? PRICE.cooler / 2 : PRICE.ups / 2;
+        S.money += back;
+        r.slots[sel.u] = null;
+        log(`Оборудование из ${LETTERS[sel.r]}/U${sel.u + 1} продано за ${money(back)}`);
+        buildRacks();
+        break;
+      }
+      case 'rack': {
+        const owned = S.racks.filter((x) => x.owned).length;
+        if (!spend(PRICE.rack[owned])) return;
+        S.racks[arg].owned = true;
+        log(`Арендована стойка ${LETTERS[arg]}`);
+        buildRacks();
+        break;
+      }
+      case 'filter':
+        if (!S.event || S.event.type !== 'ddos' || !spend(PRICE.filter)) return;
+        log('Фильтрация трафика включена, атака отбита', 'good');
+        S.event = null;
+        break;
+      case 'close':
+        S.sel = null;
+        break;
+    }
+    render();
+  }
+
+  // ---------- rendering ----------
+  function buildRacks() {
+    const root = $('#racks');
+    root.textContent = '';
+    refs = { units: [], rackHeat: [] };
+    const owned = S.racks.filter((x) => x.owned).length;
+    S.racks.forEach((r, ri) => {
+      const rack = document.createElement('div');
+      rack.className = 'rack';
+      const rail = Array.from({ length: UNITS }, (_, u) => `<span>${u + 1}</span>`).join('');
+      rack.innerHTML = `<div class="rack-head"><b>Стойка ${LETTERS[ri]}</b><span></span></div>
+        <div class="rack-body"><div class="rail" aria-hidden="true">${rail}</div><div class="units"></div></div>`;
+      refs.rackHeat[ri] = rack.querySelector('.rack-head span');
+      const list = rack.querySelector('.units');
+      refs.units[ri] = r.slots.map((s, u) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.dataset.r = ri; el.dataset.u = u;
+        if (!s) {
+          el.className = 'unit empty';
+          el.innerHTML = `<span class="name">свободно</span><span class="meta">+</span>`;
+          el.setAttribute('aria-label', `Стойка ${LETTERS[ri]}, юнит ${u + 1}: свободно`);
+        } else if (s.kind === 'server') {
+          el.className = 'unit';
+          el.innerHTML = `<span class="leds"><i class="led pwr"></i><i class="led act"></i></span><span class="name">${nameOf(ri, u)}<b>L${s.level}</b></span><span class="meta"></span><span class="bar"><i></i></span>`;
+          el.setAttribute('aria-label', `${nameOf(ri, u)}, уровень ${s.level}`);
+        } else if (s.kind === 'cooler') {
+          el.className = 'unit';
+          el.innerHTML = `<span class="fan"></span><span class="name">охлаждение</span><span class="meta">−${COOL}</span>`;
+          el.setAttribute('aria-label', `Кондиционер, стойка ${LETTERS[ri]}`);
+        } else {
+          el.className = 'unit';
+          el.innerHTML = `<span class="batt"><i></i></span><span class="name">ИБП</span><span class="meta">×4</span>`;
+          el.setAttribute('aria-label', `ИБП, стойка ${LETTERS[ri]}`);
+        }
+        list.append(el);
+        return { el, meta: el.querySelector('.meta'), bar: el.querySelector('.bar i') };
+      });
+      if (!r.owned) {
+        const lock = document.createElement('div');
+        lock.className = 'locked';
+        const price = PRICE.rack[owned];
+        lock.innerHTML = `<p>Стойка не арендована</p><button class="btn primary" type="button" data-act="rack" data-arg="${ri}">Арендовать · ${money(price)}</button>`;
+        rack.append(lock);
+      }
+      root.append(rack);
+    });
+    inspKey = '';
+  }
+
+  function render() {
+    $('#sDay').textContent = S.day;
+    $('#sTime').textContent = clock();
+    const m = $('#sMoney');
+    m.textContent = money(S.money);
+    m.classList.toggle('neg', S.money < 0);
+    $('#sLoad').textContent = `${S.served.toFixed(0)} / ${S.demand.toFixed(0)}`;
+    const ratio = S.demand ? S.served / S.demand : 1;
+    const ml = $('#mLoad');
+    ml.style.width = `${S.cap ? Math.min(100, (S.demand / S.cap) * 100) : 100}%`;
+    ml.style.backgroundColor = ratio < 0.98 ? 'var(--crit)' : S.demand / Math.max(S.cap, 1) > 0.85 ? 'var(--warn)' : 'var(--ok)';
+    $('#sRep').textContent = `${Math.round(S.rep)}%`;
+    const mr = $('#mRep');
+    mr.style.width = `${S.rep}%`;
+    mr.style.backgroundColor = S.rep < 30 ? 'var(--crit)' : S.rep < 60 ? 'var(--warn)' : 'var(--ok)';
+
+    const outage = S.event && S.event.type === 'outage';
+    S.racks.forEach((r, ri) => {
+      const h = refs.rackHeat[ri];
+      if (r.owned) {
+        h.textContent = `тепло ${Math.round(r.heat)}/${r.cool}`;
+        h.classList.toggle('over', r.heat > r.cool);
+      } else h.textContent = '';
+      r.slots.forEach((s, u) => {
+        const ref = refs.units[ri][u];
+        ref.el.classList.toggle('sel', !!S.sel && S.sel.r === ri && S.sel.u === u);
+        if (!s) return;
+        if (s.kind === 'server') {
+          const st = s.status !== 'down' && !s.powered ? 'off' : s.status;
+          ref.el.dataset.st = st;
+          ref.meta.textContent = `${Math.round(s.temp)}°`;
+          ref.el.dataset.heat = s.temp >= 85 ? 'hot' : s.temp >= 72 ? 'warm' : '';
+          ref.bar.style.width = `${s.load * 100}%`;
+          ref.el.classList.toggle('busy', s.on && s.load > 0.03);
+          ref.el.style.setProperty('--blink', `${(0.9 - s.load * 0.7).toFixed(2)}s`);
+        } else if (s.kind === 'cooler') {
+          ref.el.dataset.st = s.broken ? 'broken' : 'ok';
+          ref.meta.textContent = s.broken ? 'сбой' : `−${COOL}`;
+        } else {
+          ref.el.dataset.st = outage ? 'drain' : 'ok';
+        }
+      });
+    });
+
+    renderEvent();
+    renderInspector();
+    renderPause();
+  }
+
+  function renderEvent() {
+    const box = $('#event');
+    const ev = S.event;
+    if (!ev) { box.hidden = true; eventKey = ''; return; }
+    const key = `${ev.type}|${S.money >= PRICE.filter}`;
+    const mins = ev.left * TICK_MIN;
+    const left = `осталось ${Math.floor(mins / 60)} ч ${String(mins % 60).padStart(2, '0')} мин`;
+    if (key !== eventKey) {
+      eventKey = key;
+      const info = {
+        ddos: ['DDoS-атака', 'Трафик ×2,2. Нужен запас мощности или фильтр.'],
+        outage: ['Нет питания', 'Каждый ИБП держит 4 сервера своей стойки. Остальные обесточены.'],
+        heat: ['Жара', 'Кондиционеры не справляются: +9 °C во всех стойках.'],
+      }[ev.type];
+      box.className = `event${ev.type === 'heat' ? '' : ' crit'}`;
+      box.innerHTML = `<div class="what"><strong>${info[0]}</strong><span>${info[1]}</span></div><span class="left"></span>` +
+        (ev.type === 'ddos' ? `<button class="btn primary" type="button" data-act="filter" ${S.money < PRICE.filter ? 'disabled' : ''}>Включить фильтр · ${money(PRICE.filter)}</button>` : '');
+    }
+    box.querySelector('.left').textContent = left;
+    box.hidden = false;
+  }
+
+  function statusText(s) {
+    if (s.status === 'down') return ['Упал — нужна перезагрузка', 'crit'];
+    if (!s.powered) return ['Нет питания', 'crit'];
+    if (s.status === 'boot') return ['Загружается…', 'warn'];
+    if (s.status === 'disk') return ['Сбой диска, −50% мощности', 'warn'];
+    return ['В работе', 'ok'];
+  }
+
+  function renderInspector() {
+    const box = $('#insp');
+    const sel = S.sel;
+    box.classList.toggle('open', !!sel);
+    const s = sel && S.racks[sel.r].slots[sel.u];
+    const afford = (p) => (S.money >= p ? '' : 'disabled');
+    let key, head = '', stats = '', actions = '';
+
+    if (!sel) {
+      key = 'none';
+      head = `<h2>Инспектор</h2><p class="insp-sub">Выберите юнит в стойке, чтобы поставить оборудование или обслужить сервер.</p>`;
+      stats = `<dl class="kv"><dt>Сервер L1</dt><dd>${CAP[1]} тыс. запр/с</dd><dt>Сервер L2</dt><dd>${CAP[2]} тыс. запр/с</dd><dt>Сервер L3</dt><dd>${CAP[3]} тыс. запр/с</dd><dt>Перегрев</dt><dd class="crit">от 92 °C</dd></dl>`;
+    } else if (!s) {
+      key = `empty|${sel.r}|${sel.u}|${[PRICE.server, PRICE.cooler, PRICE.ups].map((p) => S.money >= p).join()}`;
+      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-sub">Свободный юнит. Что ставим?</p>`;
+      actions = `<div class="shop">
+        <button class="btn primary" type="button" data-act="buy" data-arg="server" ${afford(PRICE.server)}><span>Сервер L1<small>+${CAP[1]} тыс. запр/с, сильно греется</small></span><span class="price">${money(PRICE.server)}</span></button>
+        <button class="btn" type="button" data-act="buy" data-arg="cooler" ${afford(PRICE.cooler)}><span>Кондиционер<small>Снимает ${COOL} ед. тепла в стойке</small></span><span class="price">${money(PRICE.cooler)}</span></button>
+        <button class="btn" type="button" data-act="buy" data-arg="ups" ${afford(PRICE.ups)}><span>ИБП<small>Держит 4 сервера стойки без питания</small></span><span class="price">${money(PRICE.ups)}</span></button>
+      </div>`;
+    } else if (s.kind === 'server') {
+      const next = PRICE.up[s.level + 1];
+      key = `srv|${sel.r}|${sel.u}|${s.level}|${s.status}|${s.powered}|${next ? S.money >= next : 'max'}|${S.money >= PRICE.disk}`;
+      const [st, cls] = statusText(s);
+      const r = S.racks[sel.r];
+      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">${nameOf(sel.r, sel.u)} · уровень ${s.level}</p><p class="insp-sub">Мощность ${CAP[s.level]} тыс. запр/с</p>`;
+      const tc = s.temp >= 85 ? 'crit' : s.temp >= 72 ? 'warn' : '';
+      stats = `<dl class="kv"><dt>Статус</dt><dd class="${cls}">${st}</dd><dt>Нагрузка</dt><dd>${Math.round(s.load * 100)}%</dd><dt>Температура</dt><dd class="${tc}">${Math.round(s.temp)} °C</dd><dt>Тепло стойки</dt><dd class="${r.heat > r.cool ? 'crit' : ''}">${Math.round(r.heat)} / охл. ${r.cool}</dd></dl>`;
+      const a = [];
+      if (s.status === 'down') a.push(`<button class="btn primary" type="button" data-act="reboot">Перезагрузить</button>`);
+      if (s.status === 'disk') a.push(`<button class="btn primary" type="button" data-act="disk" ${afford(PRICE.disk)}>Заменить диск · ${money(PRICE.disk)}</button>`);
+      if (next) a.push(`<button class="btn" type="button" data-act="upgrade" ${afford(next)}>Апгрейд до L${s.level + 1} (${CAP[s.level + 1]} тыс.) · ${money(next)}</button>`);
+      a.push(`<button class="btn danger" type="button" data-act="sell">Продать · +${money(s.spent / 2)}</button>`);
+      actions = `<div class="actions">${a.join('')}</div>`;
+    } else if (s.kind === 'cooler') {
+      key = `cool|${sel.r}|${sel.u}|${s.broken}|${S.money >= PRICE.fix}`;
+      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">Кондиционер</p><p class="insp-sub">Снимает ${COOL} ед. тепла со всей стойки.</p>`;
+      stats = `<dl class="kv"><dt>Статус</dt><dd class="${s.broken ? 'crit' : 'ok'}">${s.broken ? 'Сломан' : 'Работает'}</dd></dl>`;
+      actions = `<div class="actions">${s.broken ? `<button class="btn primary" type="button" data-act="fix" ${afford(PRICE.fix)}>Починить · ${money(PRICE.fix)}</button>` : ''}<button class="btn danger" type="button" data-act="sell">Продать · +${money(PRICE.cooler / 2)}</button></div>`;
+    } else {
+      key = `ups|${sel.r}|${sel.u}`;
+      head = `<button class="btn insp-close" type="button" data-act="close">Закрыть</button><h2>Стойка ${LETTERS[sel.r]} · U${sel.u + 1}</h2><p class="insp-title">ИБП</p><p class="insp-sub">При отключении питания держит 4 сервера этой стойки (сверху вниз).</p>`;
+      actions = `<div class="actions"><button class="btn danger" type="button" data-act="sell">Продать · +${money(PRICE.ups / 2)}</button></div>`;
+    }
+
+    if (key !== inspKey) {
+      inspKey = key;
+      box.innerHTML = `${head}<div class="insp-stats">${stats}</div>${actions}`;
+    } else {
+      box.querySelector('.insp-stats').innerHTML = stats;
+    }
+  }
+
+  function renderLog() {
+    $('#log').innerHTML = S.log.map((e) => `<li class="${e.lvl}"><time>${e.t}</time><span>${e.msg}</span></li>`).join('');
+  }
+
+  function renderPause() {
+    $('#bPause').textContent = S.paused ? 'Продолжить' : 'Пауза';
+    document.querySelectorAll('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === S.speed)));
+  }
+
+  function showOverlay(mode, info) {
+    const card = $('#card');
+    if (mode === 'start') {
+      card.innerHTML = `<h2>Ночная смена</h2>
+        <p>Вы — дежурный сисадмин. Трафик растёт каждый день, а железо греется и ломается.</p>
+        <ul>
+          <li>Ставьте серверы в свободные юниты, чтобы обслужить трафик.</li>
+          <li>Следите за теплом стойки: выше 92 °C сервер падает. Кондиционеры спасают.</li>
+          <li>ИБП держат сервера при отключении питания, фильтр отбивает DDoS.</li>
+          <li>Каждый недообслуженный запрос бьёт по репутации. Ноль — и смена окончена.</li>
+        </ul>
+        <button class="btn primary" type="button" data-act="start">Начать смену</button>`;
+    } else {
+      const days = (v) => `${v.toFixed(1).replace('.', ',')} дн.`;
+      card.innerHTML = `<h2>Сервис лёг</h2>
+        <p>${info.isBest ? 'Новый рекорд смены.' : 'Клиенты ушли к конкурентам.'}</p>
+        <div class="score">
+          <div class="stat"><span class="k">Продержались</span><span class="v">${days(info.result)}</span></div>
+          <div class="stat"><span class="k">Заработано</span><span class="v">${money(S.earned)}</span></div>
+          <div class="stat"><span class="k">Рекорд</span><span class="v">${days(info.best)}</span></div>
+        </div>
+        <button class="btn primary" type="button" data-act="restart">Новая смена</button>`;
+    }
+    $('#overlay').hidden = false;
+  }
+
+  // ---------- input ----------
+  document.addEventListener('click', (e) => {
+    const unit = e.target.closest('.unit');
+    if (unit && !S.over) {
+      const r = Number(unit.dataset.r), u = Number(unit.dataset.u);
+      if (!S.racks[r].owned) return;
+      S.sel = S.sel && S.sel.r === r && S.sel.u === u ? null : { r, u };
+      render();
+      return;
+    }
+    const btn = e.target.closest('[data-act]');
+    if (!btn || btn.disabled) return;
+    const a = btn.dataset.act;
+    if (a === 'start') { S.started = true; $('#overlay').hidden = true; return; }
+    if (a === 'restart') { S = newState(); S.started = true; $('#overlay').hidden = true; buildRacks(); renderLog(); boot(); render(); return; }
+    act(a, btn.dataset.arg);
+  });
+  document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { S.speed = Number(b.dataset.speed); S.paused = false; renderPause(); }));
+  $('#bPause').addEventListener('click', () => { S.paused = !S.paused; renderPause(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && S.started && !S.over && e.target === document.body) { e.preventDefault(); S.paused = !S.paused; renderPause(); }
+    if (e.key === 'Escape' && S.sel) { S.sel = null; render(); }
+  });
+
+  function boot() {
+    log('Смена началась. Две машины в стойке A, трафик скромный');
+  }
+
+  function start(data) {
+    S = data && data.S ? data.S : newState();
+    buildRacks();
+    renderLog();
+    if (!S.log.length) boot();
+    render();
+    if (S.over) gameOver();
+    else if (!S.started) showOverlay('start');
+    setInterval(() => {
+      if (!S.started || S.paused || S.over) return;
+      for (let i = 0; i < S.speed && !S.over; i++) tick();
+      render();
+    }, TICK_MS);
+  }
+
+  window.claude?.hot?.snapshot?.(() => ({ S }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
